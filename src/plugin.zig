@@ -210,6 +210,7 @@ fn getExtension(
     if (0 == c.strcmp(id, &clap.CLAP_EXT_NOTE_PORTS)) return &extension_note_ports;
     if (0 == c.strcmp(id, &clap.CLAP_EXT_AUDIO_PORTS)) return &extension_audio_ports;
     if (0 == c.strcmp(id, &clap.CLAP_EXT_PARAMS)) return &extension_params;
+    if (0 == c.strcmp(id, &clap.CLAP_EXT_STATE)) return &extension_plugin_state;
 
     return null;
 }
@@ -365,6 +366,37 @@ fn extParamFlush(
     }
 }
 
+const extension_plugin_state: clap.clap_plugin_state_t = .{
+    .save = extStateSave,
+    .load = extStateLoad,
+};
+
+fn extStateSave(
+    clap_plugin: [*c]const clap.clap_plugin_t,
+    stream: [*c]const clap.clap_ostream_t,
+) callconv(.c) bool {
+    const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+
+    // TODO
+    _ = plugin;
+    _ = stream;
+
+    return false;
+}
+
+fn extStateLoad(
+    clap_plugin: [*c]const clap.clap_plugin_t,
+    stream: [*c]const clap.clap_istream_t,
+) callconv(.c) bool {
+    const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+
+    // TODO
+    _ = plugin;
+    _ = stream;
+
+    return false;
+}
+
 // ---MyPlugin---
 
 const Voice = struct {
@@ -513,7 +545,7 @@ const MyPlugin = struct {
             for (self.voices.items) |*voice| {
                 if (voice.held == false) continue;
 
-                sample += @sin(voice.phase * 2.0 * 3.14159) * 0.2 * volume;
+                sample += @sin(voice.phase * 2.0 * std.math.pi) * 0.2 * volume;
 
                 const key_float: f32 = @floatFromInt(voice.key);
                 voice.phase += 440.0 * std.math.exp2((key_float - 57.0) / 12.0) / self.sample_rate;
