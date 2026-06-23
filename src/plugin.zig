@@ -121,6 +121,7 @@ fn initPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) bool {
 
 fn destroyPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) void {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+    plugin.deinit();
     c.free(plugin);
 }
 
@@ -169,6 +170,8 @@ fn processPlugin(
     std.debug.assert(process.*.audio_inputs_count == 0);
     std.debug.assert(process.*.audio_outputs_count == 1);
 
+    plugin.syncMainToAudio(process.*.out_events);
+
     const frame_count = process.*.frames_count;
     const input_event_count = process.*.in_events.*.size.?(process.*.in_events);
     var event_index: u32 = 0;
@@ -206,6 +209,7 @@ fn getExtension(
 ) callconv(.c) ?*const anyopaque {
     if (0 == c.strcmp(id, &clap.CLAP_EXT_NOTE_PORTS)) return &extension_note_ports;
     if (0 == c.strcmp(id, &clap.CLAP_EXT_AUDIO_PORTS)) return &extension_audio_ports;
+    if (0 == c.strcmp(id, &clap.CLAP_EXT_PARAMS)) return &extension_params;
 
     return null;
 }
@@ -278,6 +282,89 @@ fn getAudioPorts(
     return true;
 }
 
+const extension_params: clap.clap_plugin_params_t = .{
+    .count = extParamCount,
+    .get_info = extParamGetInfo,
+    .get_value = extParamGetValue,
+    .value_to_text = extParamValueToText,
+    .text_to_value = extParamTextToValue,
+    .flush = extParamFlush,
+};
+
+fn extParamCount(_: [*c]const clap.clap_plugin_t) callconv(.c) u32 {
+    return MyPlugin.parameter_count;
+}
+
+fn extParamGetInfo(
+    _: [*c]const clap.clap_plugin_t,
+    index: u32,
+    info: [*c]clap.clap_param_info_t,
+) callconv(.c) bool {
+    if (index != @intFromEnum(MyPlugin.ParameterIndex.volume)) return false;
+
+    info.* = .{};
+    info.*.id = index;
+    info.*.flags = clap.CLAP_PARAM_IS_AUTOMATABLE; // | clap.CLAP_PARAM_IS_MODULATABLE;
+    info.*.min_value = 0.0;
+    info.*.max_value = 1.0;
+    info.*.default_value = 0.5;
+    _ = std.fmt.bufPrintSentinel(&info.*.name[0], "Volume", .{}, 0) catch return false;
+
+    return true;
+}
+
+/// This will be called on the main thread, so we need to communicate this info to the audio thread
+fn extParamGetValue(clap_plugin: [*c]const clap.clap_plugin_t, index: u32, value: [*c]f64) callconv(.c) bool {
+    if (index >= MyPlugin.parameter_count) return false;
+    const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+
+    plugin.parameter_mutex.lockUncancelable(plugin.io);
+    defer plugin.parameter_mutex.unlock(plugin.io);
+
+    value.* = @floatCast(if (plugin.changed_main[index]) plugin.parameters_main[index] else plugin.parameters[index]);
+    return true;
+}
+
+fn extParamValueToText(
+    _: [*c]const clap.clap_plugin_t,
+    id: clap.clap_id,
+    value: f64,
+    display: [*c]u8,
+    size: u32,
+) callconv(.c) bool {
+    if (id >= MyPlugin.parameter_count) return false;
+
+    _ = std.fmt.bufPrintSentinel(display[0..size], "{}", .{value}, 0) catch return false;
+    return true;
+}
+
+fn extParamTextToValue(
+    _: [*c]const clap.clap_plugin_t,
+    id: clap.clap_id,
+    display: [*c]const u8,
+    value: [*c]f64,
+) callconv(.c) bool {
+    // TODO
+    _ = id;
+    _ = display;
+    _ = value;
+    return false;
+}
+
+fn extParamFlush(
+    clap_plugin: [*c]const clap.clap_plugin_t,
+    in: [*c]const clap.clap_input_events_t,
+    out: [*c]const clap.clap_output_events_t,
+) callconv(.c) void {
+    const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+    const event_count = in.*.size.?(in);
+
+    plugin.syncMainToAudio(out);
+    for (0..event_count) |i| {
+        plugin.processEvent(in.*.get.?(in, @intCast(i)));
+    }
+}
+
 // ---MyPlugin---
 
 const Voice = struct {
@@ -289,12 +376,26 @@ const Voice = struct {
 };
 
 const MyPlugin = struct {
+    const max_voices = 8;
+    const ParameterIndex = enum { volume, COUNT };
+    const parameter_count = @intFromEnum(ParameterIndex.COUNT);
+
     allocator: std.mem.Allocator,
+    io: std.Io,
+    io_impl: std.Io.Threaded,
+
     plugin: clap.clap_plugin_t,
     host: *const clap.clap_host_t,
+
     sample_rate: f32,
     voices: std.ArrayList(Voice),
-    voices_buffer: [8]Voice = undefined,
+    voices_buffer: [max_voices]Voice = undefined,
+
+    parameters: [parameter_count]f32,
+    parameters_main: [parameter_count]f32,
+    changed: [parameter_count]bool,
+    changed_main: [parameter_count]bool,
+    parameter_mutex: std.Io.Mutex,
 
     fn init(
         self: *@This(),
@@ -302,16 +403,41 @@ const MyPlugin = struct {
         host: *const clap.clap_host_t,
     ) void {
         self.allocator = std.heap.smp_allocator;
+        self.io_impl = .init_single_threaded;
+        self.io = self.io_impl.io();
+
         self.plugin = clap_plugin;
         self.plugin.plugin_data = self;
         self.host = host;
+
         self.voices = .initBuffer(&self.voices_buffer);
+
+        for (0..parameter_count) |i| {
+            var info: clap.clap_param_info_t = .{};
+            _ = extension_params.get_info.?(&self.plugin, @intCast(i), &info);
+            self.parameters[i] = @floatCast(info.default_value);
+            self.parameters_main[i] = @floatCast(info.default_value);
+        }
+        self.changed = [_]bool{false} ** parameter_count;
+        self.changed_main = [_]bool{false} ** parameter_count;
+        self.parameter_mutex = .init;
+    }
+
+    fn deinit(self: *@This()) void {
+        self.io_impl.deinit();
     }
 
     fn processEvent(self: *@This(), event: *const clap.clap_event_header_t) void {
         if (event.space_id != clap.CLAP_CORE_EVENT_SPACE_ID) return;
-        if (!isNoteEventClap(event.type)) return;
 
+        if (isNoteEventClap(event.type)) {
+            self.handleNoteEvent(event);
+        } else if (event.type == clap.CLAP_EVENT_PARAM_VALUE) {
+            self.handleParamValueEvent(event);
+        }
+    }
+
+    fn handleNoteEvent(self: *@This(), event: *const clap.clap_event_header_t) void {
         const note_event: *const clap.clap_event_note_t = @ptrCast(@alignCast(event));
 
         var i = self.voices.items.len;
@@ -338,7 +464,48 @@ const MyPlugin = struct {
         }
     }
 
+    fn handleParamValueEvent(self: *@This(), event: *const clap.clap_event_header_t) void {
+        const value_event: *const clap.clap_event_param_value_t = @ptrCast(@alignCast(event));
+        const i = value_event.param_id;
+
+        self.parameter_mutex.lockUncancelable(self.io);
+        defer self.parameter_mutex.unlock(self.io);
+
+        self.parameters[i] = @floatCast(value_event.value);
+        self.changed[i] = true;
+    }
+
+    fn syncMainToAudio(self: *@This(), out: [*c]const clap.clap_output_events_t) void {
+        self.parameter_mutex.lockUncancelable(self.io);
+        defer self.parameter_mutex.unlock(self.io);
+
+        for (0..parameter_count) |i| {
+            if (self.changed_main[i] == false) continue;
+
+            self.parameters[i] = self.parameters_main[i];
+            self.changed_main[i] = false;
+
+            const event: clap.clap_event_param_value_t = .{
+                .header = .{
+                    .size = @sizeOf(clap.clap_event_param_value_t),
+                    .space_id = clap.CLAP_CORE_EVENT_SPACE_ID,
+                    .type = clap.CLAP_EVENT_PARAM_VALUE,
+                },
+                .param_id = @intCast(i),
+                .note_id = -1,
+                .port_index = -1,
+                .channel = -1,
+                .key = -1,
+                .value = self.parameters[i],
+            };
+
+            _ = out.*.try_push.?(out, &event.header);
+        }
+    }
+
     fn renderAudio(self: *@This(), start: u32, end: u32, outputL: [*]f32, outputR: [*]f32) void {
+        const volume = self.parameters[@intFromEnum(ParameterIndex.volume)];
+
         var i: u32 = start;
         while (i < end) : (i += 1) {
             var sample: f32 = 0.0;
@@ -346,7 +513,7 @@ const MyPlugin = struct {
             for (self.voices.items) |*voice| {
                 if (voice.held == false) continue;
 
-                sample += @sin(voice.phase * 2.0 * 3.14159) * 0.2;
+                sample += @sin(voice.phase * 2.0 * 3.14159) * 0.2 * volume;
 
                 const key_float: f32 = @floatFromInt(voice.key);
                 voice.phase += 440.0 * std.math.exp2((key_float - 57.0) / 12.0) / self.sample_rate;
@@ -371,6 +538,7 @@ fn isNoteEventClap(event_type: u16) bool {
 test {
     var my_plugin: MyPlugin = undefined;
     my_plugin.init(plugin_class, undefined);
+    defer my_plugin.deinit();
 
     const clap_process: clap.clap_process_t = .{
         .audio_outputs_count = 1,
