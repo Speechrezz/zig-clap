@@ -377,11 +377,13 @@ fn extStateSave(
 ) callconv(.c) bool {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-    // TODO
-    _ = plugin;
-    _ = stream;
+    plugin.parameter_mutex.lockUncancelable(plugin.io);
+    defer plugin.parameter_mutex.unlock(plugin.io);
 
-    return false;
+    const byte_count = @sizeOf(@TypeOf(plugin.parameters));
+
+    const result = stream.*.write.?(stream, &plugin.parameters, byte_count);
+    return result == byte_count;
 }
 
 fn extStateLoad(
@@ -390,11 +392,13 @@ fn extStateLoad(
 ) callconv(.c) bool {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-    // TODO
-    _ = plugin;
-    _ = stream;
+    plugin.parameter_mutex.lockUncancelable(plugin.io);
+    defer plugin.parameter_mutex.unlock(plugin.io);
 
-    return false;
+    const byte_count = @sizeOf(@TypeOf(plugin.parameters));
+
+    const result = stream.*.read.?(stream, &plugin.parameters, byte_count);
+    return result == byte_count;
 }
 
 // ---MyPlugin---
