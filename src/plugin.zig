@@ -1,13 +1,11 @@
 const std = @import("std");
-
-const clap = @cImport({
-    @cInclude("clap/clap.h");
-});
+const builtin = @import("builtin");
+const dbg = @import("debug_clap.zig");
+const clap = @import("clap.zig").c;
 
 const c = @cImport({
     @cInclude("string.h");
     @cInclude("stdlib.h");
-    @cInclude("stdio.h");
 });
 
 const clap_version: clap.clap_version_t = .{
@@ -74,10 +72,7 @@ fn createPlugin(
 
     // TODO: Maybe don't use malloc here lol
     const plugin: *MyPlugin = @ptrCast(@alignCast(c.malloc(@sizeOf(MyPlugin))));
-    plugin.host = host;
-    plugin.plugin = plugin_class;
-    plugin.plugin.plugin_data = plugin;
-    plugin.voices = .initBuffer(&plugin.voices_buffer);
+    plugin.init(plugin_class, host);
     return &plugin.plugin;
 }
 
@@ -87,9 +82,9 @@ const plugin_descriptor: clap.clap_plugin_descriptor_t = .{
     .name = "Test2",
     .vendor = "Xynth Audio",
     .url = "xynth.audio",
-    .manual_url = "https://nakst.gitlab.io",
-    .support_url = "https://nakst.gitlab.io",
-    .version = "1.0.0",
+    .manual_url = "https://github.com/Speechrezz/zig-clap",
+    .support_url = "https://github.com/Speechrezz/zig-clap",
+    .version = "0.0.1",
     .description = "The best audio plugin ever.",
     .features = &plugin_features,
 };
@@ -126,7 +121,7 @@ fn initPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) bool {
 
 fn destroyPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) void {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-    _ = plugin;
+    c.free(plugin);
 }
 
 fn activatePlugin(
@@ -241,7 +236,12 @@ fn getNotePorts(
     info.*.id = 0;
     info.*.supported_dialects = clap.CLAP_NOTE_DIALECT_CLAP;
     info.*.preferred_dialect = clap.CLAP_NOTE_DIALECT_CLAP;
-    _ = c.snprintf(&info.*.name[0], info.*.name.len, "%s", "Note Port");
+    _ = std.fmt.bufPrintSentinel(
+        &info.*.name[0],
+        "Note Port",
+        .{},
+        0,
+    ) catch return false;
 
     return true;
 }
@@ -268,7 +268,12 @@ fn getAudioPorts(
     info.*.flags = clap.CLAP_AUDIO_PORT_IS_MAIN;
     info.*.port_type = &clap.CLAP_PORT_STEREO;
     info.*.in_place_pair = clap.CLAP_INVALID_ID;
-    _ = c.snprintf(&info.*.name[0], info.*.name.len, "%s", "Audio Output");
+    _ = std.fmt.bufPrintSentinel(
+        &info.*.name[0],
+        "Audio Output",
+        .{},
+        0,
+    ) catch return false;
 
     return true;
 }
@@ -284,11 +289,24 @@ const Voice = struct {
 };
 
 const MyPlugin = struct {
+    allocator: std.mem.Allocator,
     plugin: clap.clap_plugin_t,
     host: *const clap.clap_host_t,
     sample_rate: f32,
     voices: std.ArrayList(Voice),
     voices_buffer: [8]Voice = undefined,
+
+    fn init(
+        self: *@This(),
+        clap_plugin: clap.clap_plugin_t,
+        host: *const clap.clap_host_t,
+    ) void {
+        self.allocator = std.heap.smp_allocator;
+        self.plugin = clap_plugin;
+        self.plugin.plugin_data = self;
+        self.host = host;
+        self.voices = .initBuffer(&self.voices_buffer);
+    }
 
     fn processEvent(self: *@This(), event: *const clap.clap_event_header_t) void {
         if (event.space_id != clap.CLAP_CORE_EVENT_SPACE_ID) return;
@@ -305,11 +323,7 @@ const MyPlugin = struct {
             const id_match = note_event.note_id == -1 or note_event.note_id == voice.note_id;
             const channel_match = note_event.channel == -1 or note_event.channel == voice.channel;
             if (key_match and id_match and channel_match) {
-                // if (event.type == clap.CLAP_EVENT_NOTE_CHOKE) {
                 _ = self.voices.orderedRemove(i);
-                //     } else {
-                //         voice.held = false;
-                // }
             }
         }
 
@@ -356,12 +370,11 @@ fn isNoteEventClap(event_type: u16) bool {
 
 test {
     var my_plugin: MyPlugin = undefined;
-    my_plugin.plugin = plugin_class;
-    my_plugin.plugin.plugin_data = &my_plugin;
-    my_plugin.voices = .initBuffer(&my_plugin.voices_buffer);
+    my_plugin.init(plugin_class, undefined);
 
     const clap_process: clap.clap_process_t = .{
         .audio_outputs_count = 1,
+        .in_events = dbg.initDummyInputEvents(),
     };
 
     const plugin = &my_plugin.plugin;
