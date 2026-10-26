@@ -1,3 +1,1 @@
-pub const c = @cImport({
-    @cInclude("clap/clap.h");
-});
+pub const c = @import("c");

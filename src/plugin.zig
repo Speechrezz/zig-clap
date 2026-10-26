@@ -1,12 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const dbg = @import("debug_clap.zig");
-const clap = @import("clap.zig").c;
-
-const c = @cImport({
-    @cInclude("string.h");
-    @cInclude("stdlib.h");
-});
+const c = @import("clap.zig").c;
+const clap = c;
 
 const clap_version: clap.clap_version_t = .{
     .major = clap.CLAP_VERSION_MAJOR,
@@ -301,9 +297,9 @@ fn extParamGetInfo(
     index: u32,
     info: [*c]clap.clap_param_info_t,
 ) callconv(.c) bool {
-    if (index != @intFromEnum(MyPlugin.ParameterIndex.volume)) return false;
+    if (index != @backingInt(MyPlugin.ParameterIndex.volume)) return false;
 
-    info.* = .{};
+    info.* = std.mem.zeroes(clap.clap_param_info_t);
     info.*.id = index;
     info.*.flags = clap.CLAP_PARAM_IS_AUTOMATABLE; // | clap.CLAP_PARAM_IS_MODULATABLE;
     info.*.min_value = 0.0;
@@ -414,7 +410,7 @@ const Voice = struct {
 const MyPlugin = struct {
     const max_voices = 8;
     const ParameterIndex = enum { volume, COUNT };
-    const parameter_count = @intFromEnum(ParameterIndex.COUNT);
+    const parameter_count = @backingInt(ParameterIndex.COUNT);
 
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -454,8 +450,8 @@ const MyPlugin = struct {
             self.parameters[i] = @floatCast(info.default_value);
             self.parameters_main[i] = @floatCast(info.default_value);
         }
-        self.changed = [_]bool{false} ** parameter_count;
-        self.changed_main = [_]bool{false} ** parameter_count;
+        self.changed = @splat(false);
+        self.changed_main = @splat(false);
         self.parameter_mutex = .init;
     }
 
@@ -540,7 +536,7 @@ const MyPlugin = struct {
     }
 
     fn renderAudio(self: *@This(), start: u32, end: u32, outputL: [*]f32, outputR: [*]f32) void {
-        const volume = self.parameters[@intFromEnum(ParameterIndex.volume)];
+        const volume = self.parameters[@backingInt(ParameterIndex.volume)];
 
         var i: u32 = start;
         while (i < end) : (i += 1) {
