@@ -1,9 +1,7 @@
 const std = @import("std");
 const Io = std.Io;
 
-const clap = @cImport({
-    @cInclude("clap/clap.h");
-});
+const clap = @import("clap.zig").c;
 
 pub fn main(init: std.process.Init) !void {
     // Prints to stderr, unbuffered, ignoring potential errors.

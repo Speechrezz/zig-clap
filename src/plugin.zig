@@ -580,10 +580,9 @@ test {
     my_plugin.init(plugin_class, undefined);
     defer my_plugin.deinit();
 
-    const clap_process: clap.clap_process_t = .{
-        .audio_outputs_count = 1,
-        .in_events = dbg.initDummyInputEvents(),
-    };
+    var clap_process = std.mem.zeroes(clap.clap_process_t);
+    clap_process.audio_outputs_count = 1;
+    clap_process.in_events = dbg.initDummyInputEvents();
 
     const plugin = &my_plugin.plugin;
     try std.testing.expect(plugin.init.?(plugin));

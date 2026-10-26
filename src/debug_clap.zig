@@ -7,6 +7,8 @@ fn dummyInputEventsSize(_: [*c]const clap.clap_input_events_t) callconv(.c) u32 
 
 pub fn initDummyInputEvents() [*c]const clap.clap_input_events_t {
     return &.{
+        .ctx = null,
         .size = dummyInputEventsSize,
+        .get = null,
     };
 }
