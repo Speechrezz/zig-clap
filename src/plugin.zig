@@ -237,8 +237,8 @@ fn getNotePorts(
     info.*.id = 0;
     info.*.supported_dialects = clap.CLAP_NOTE_DIALECT_CLAP;
     info.*.preferred_dialect = clap.CLAP_NOTE_DIALECT_CLAP;
-    _ = std.fmt.bufPrintSentinel(
-        &info.*.name[0],
+    _ = std.mem.printSentinel(
+        &info.*.name,
         "Note Port",
         .{},
         0,
@@ -269,8 +269,8 @@ fn getAudioPorts(
     info.*.flags = clap.CLAP_AUDIO_PORT_IS_MAIN;
     info.*.port_type = &clap.CLAP_PORT_STEREO;
     info.*.in_place_pair = clap.CLAP_INVALID_ID;
-    _ = std.fmt.bufPrintSentinel(
-        &info.*.name[0],
+    _ = std.mem.printSentinel(
+        &info.*.name,
         "Audio Output",
         .{},
         0,
@@ -305,7 +305,12 @@ fn extParamGetInfo(
     info.*.min_value = 0.0;
     info.*.max_value = 1.0;
     info.*.default_value = 0.5;
-    _ = std.fmt.bufPrintSentinel(&info.*.name[0], "Volume", .{}, 0) catch return false;
+    _ = std.mem.printSentinel(
+        &info.*.name,
+        "Volume",
+        .{},
+        0,
+    ) catch return false;
 
     return true;
 }
@@ -445,7 +450,7 @@ const MyPlugin = struct {
         self.voices = .initBuffer(&self.voices_buffer);
 
         for (0..parameter_count) |i| {
-            var info: clap.clap_param_info_t = .{};
+            var info = std.mem.zeroes(clap.clap_param_info_t);
             _ = extension_params.get_info.?(&self.plugin, @intCast(i), &info);
             self.parameters[i] = @floatCast(info.default_value);
             self.parameters_main[i] = @floatCast(info.default_value);
@@ -520,10 +525,13 @@ const MyPlugin = struct {
             const event: clap.clap_event_param_value_t = .{
                 .header = .{
                     .size = @sizeOf(clap.clap_event_param_value_t),
+                    .time = 0,
                     .space_id = clap.CLAP_CORE_EVENT_SPACE_ID,
                     .type = clap.CLAP_EVENT_PARAM_VALUE,
+                    .flags = 0,
                 },
                 .param_id = @intCast(i),
+                .cookie = null,
                 .note_id = -1,
                 .port_index = -1,
                 .channel = -1,
