@@ -9,6 +9,11 @@ const clap_version: c.clap_version_t = .{
     .revision = c.CLAP_VERSION_REVISION,
 };
 
+// Returns `true` if the two C-Strings are equal
+fn cStrEql(lhs: [*:0]const u8, rhs: [*:0]const u8) bool {
+    return std.mem.orderZ(u8, lhs, rhs) == .eq;
+}
+
 // ---Entry---
 
 export const clap_entry: c.clap_plugin_entry_t = .{
@@ -26,7 +31,7 @@ fn entryInit(plugin_path: [*c]const u8) callconv(.c) bool {
 fn entryDeinit() callconv(.c) void {}
 
 fn entryGetFactory(factory_id: [*c]const u8) callconv(.c) ?*const anyopaque {
-    const does_id_match = c.strcmp(factory_id, &c.CLAP_PLUGIN_FACTORY_ID) == 0;
+    const does_id_match = cStrEql(factory_id.?, &c.CLAP_PLUGIN_FACTORY_ID);
     if (!does_id_match) return null;
 
     return &plugin_factory;
@@ -60,7 +65,7 @@ fn createPlugin(
     plugin_id: [*c]const u8,
 ) callconv(.c) [*c]const c.clap_plugin_t {
     const is_version_compatible = c.clap_version_is_compatible(host.*.clap_version);
-    const is_id_matching = c.strcmp(plugin_id, plugin_descriptor.id) == 0;
+    const is_id_matching = cStrEql(plugin_id.?, plugin_descriptor.id.?);
     if (!is_version_compatible or !is_id_matching) {
         return null;
     }
@@ -202,10 +207,10 @@ fn getExtension(
     _: [*c]const c.clap_plugin_t,
     id: [*c]const u8,
 ) callconv(.c) ?*const anyopaque {
-    if (0 == c.strcmp(id, &c.CLAP_EXT_NOTE_PORTS)) return &extension_note_ports;
-    if (0 == c.strcmp(id, &c.CLAP_EXT_AUDIO_PORTS)) return &extension_audio_ports;
-    if (0 == c.strcmp(id, &c.CLAP_EXT_PARAMS)) return &extension_params;
-    if (0 == c.strcmp(id, &c.CLAP_EXT_STATE)) return &extension_plugin_state;
+    if (cStrEql(id.?, &c.CLAP_EXT_NOTE_PORTS)) return &extension_note_ports;
+    if (cStrEql(id.?, &c.CLAP_EXT_AUDIO_PORTS)) return &extension_audio_ports;
+    if (cStrEql(id.?, &c.CLAP_EXT_PARAMS)) return &extension_params;
+    if (cStrEql(id.?, &c.CLAP_EXT_STATE)) return &extension_plugin_state;
 
     return null;
 }
@@ -335,7 +340,7 @@ fn extParamValueToText(
 ) callconv(.c) bool {
     if (id >= MyPlugin.parameter_count) return false;
 
-    _ = std.fmt.bufPrintSentinel(display[0..size], "{}", .{value}, 0) catch return false;
+    _ = std.mem.printSentinel(display[0..size], "{}", .{value}, 0) catch return false;
     return true;
 }
 
