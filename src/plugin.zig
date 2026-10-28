@@ -416,11 +416,17 @@ const Voice = struct {
     phase: f32,
 };
 
+const use_safe_allocator = switch (builtin.mode) {
+    .debug, .safe => true,
+    else => false,
+};
+
 const MyPlugin = struct {
     const max_voices = 8;
     const ParameterIndex = enum { volume, COUNT };
-    const parameter_count = @backingInt(ParameterIndex.COUNT);
+    const parameter_count = std.enums.values(ParameterIndex).len;
 
+    safe_allocator: if (use_safe_allocator) std.heap.SafeAllocator else void,
     allocator: std.mem.Allocator,
     io: std.Io,
     io_impl: std.Io.Threaded,
@@ -443,7 +449,13 @@ const MyPlugin = struct {
         clap_plugin: c.clap_plugin_t,
         host: *const c.clap_host_t,
     ) void {
-        self.allocator = std.heap.smp_allocator;
+        if (use_safe_allocator) {
+            self.safe_allocator = .init(std.heap.smp_allocator, .{});
+            self.allocator = self.safe_allocator.allocator();
+        } else {
+            self.allocator = std.heap.smp_allocator;
+        }
+
         self.io_impl = .init_single_threaded;
         self.io = self.io_impl.io();
 
@@ -465,6 +477,10 @@ const MyPlugin = struct {
     }
 
     fn deinit(self: *@This()) void {
+        if (use_safe_allocator) {
+            _ = self.safe_allocator.deinit();
+        }
+
         self.io_impl.deinit();
     }
 
