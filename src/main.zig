@@ -1,7 +1,7 @@
 const std = @import("std");
 const Io = std.Io;
 
-const clap = @import("clap.zig").c;
+const c = @import("c");
 
 pub fn main(init: std.process.Init) !void {
     // Prints to stderr, unbuffered, ignoring potential errors.
@@ -18,9 +18,9 @@ pub fn main(init: std.process.Init) !void {
 
     // CLAP
     std.debug.print("CLAP version: {}.{}.{}\n", .{
-        clap.CLAP_VERSION_MAJOR,
-        clap.CLAP_VERSION_MINOR,
-        clap.CLAP_VERSION_REVISION,
+        c.CLAP_VERSION_MAJOR,
+        c.CLAP_VERSION_MINOR,
+        c.CLAP_VERSION_REVISION,
     });
 }
 

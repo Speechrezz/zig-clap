@@ -1,18 +1,17 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const dbg = @import("debug_clap.zig");
-const c = @import("clap.zig").c;
-const clap = c;
+const c = @import("c");
 
-const clap_version: clap.clap_version_t = .{
-    .major = clap.CLAP_VERSION_MAJOR,
-    .minor = clap.CLAP_VERSION_MINOR,
-    .revision = clap.CLAP_VERSION_REVISION,
+const clap_version: c.clap_version_t = .{
+    .major = c.CLAP_VERSION_MAJOR,
+    .minor = c.CLAP_VERSION_MINOR,
+    .revision = c.CLAP_VERSION_REVISION,
 };
 
 // ---Entry---
 
-export const clap_entry: clap.clap_plugin_entry_t = .{
+export const clap_entry: c.clap_plugin_entry_t = .{
     .clap_version = clap_version,
     .init = entryInit,
     .deinit = entryDeinit,
@@ -27,7 +26,7 @@ fn entryInit(plugin_path: [*c]const u8) callconv(.c) bool {
 fn entryDeinit() callconv(.c) void {}
 
 fn entryGetFactory(factory_id: [*c]const u8) callconv(.c) ?*const anyopaque {
-    const does_id_match = c.strcmp(factory_id, &clap.CLAP_PLUGIN_FACTORY_ID) == 0;
+    const does_id_match = c.strcmp(factory_id, &c.CLAP_PLUGIN_FACTORY_ID) == 0;
     if (!does_id_match) return null;
 
     return &plugin_factory;
@@ -35,20 +34,20 @@ fn entryGetFactory(factory_id: [*c]const u8) callconv(.c) ?*const anyopaque {
 
 // ---Factory---
 
-const plugin_factory: clap.clap_plugin_factory_t = .{
+const plugin_factory: c.clap_plugin_factory_t = .{
     .get_plugin_count = getPluginCount,
     .get_plugin_descriptor = getPluginDescriptor,
     .create_plugin = createPlugin,
 };
 
-fn getPluginCount(_: [*c]const clap.clap_plugin_factory_t) callconv(.c) u32 {
+fn getPluginCount(_: [*c]const c.clap_plugin_factory_t) callconv(.c) u32 {
     return 1;
 }
 
 fn getPluginDescriptor(
-    _: [*c]const clap.clap_plugin_factory_t,
+    _: [*c]const c.clap_plugin_factory_t,
     index: u32,
-) callconv(.c) [*c]const clap.clap_plugin_descriptor_t {
+) callconv(.c) [*c]const c.clap_plugin_descriptor_t {
     if (index != 0)
         return null;
 
@@ -56,11 +55,11 @@ fn getPluginDescriptor(
 }
 
 fn createPlugin(
-    _: [*c]const clap.clap_plugin_factory_t,
-    host: [*c]const clap.clap_host_t,
+    _: [*c]const c.clap_plugin_factory_t,
+    host: [*c]const c.clap_host_t,
     plugin_id: [*c]const u8,
-) callconv(.c) [*c]const clap.clap_plugin_t {
-    const is_version_compatible = clap.clap_version_is_compatible(host.*.clap_version);
+) callconv(.c) [*c]const c.clap_plugin_t {
+    const is_version_compatible = c.clap_version_is_compatible(host.*.clap_version);
     const is_id_matching = c.strcmp(plugin_id, plugin_descriptor.id) == 0;
     if (!is_version_compatible or !is_id_matching) {
         return null;
@@ -72,7 +71,7 @@ fn createPlugin(
     return &plugin.plugin;
 }
 
-const plugin_descriptor: clap.clap_plugin_descriptor_t = .{
+const plugin_descriptor: c.clap_plugin_descriptor_t = .{
     .clap_version = clap_version,
     .id = "xynth.Test2",
     .name = "Test2",
@@ -86,15 +85,15 @@ const plugin_descriptor: clap.clap_plugin_descriptor_t = .{
 };
 
 const plugin_features = [_][*c]const u8{
-    clap.CLAP_PLUGIN_FEATURE_INSTRUMENT,
-    clap.CLAP_PLUGIN_FEATURE_SYNTHESIZER,
-    clap.CLAP_PLUGIN_FEATURE_STEREO,
+    c.CLAP_PLUGIN_FEATURE_INSTRUMENT,
+    c.CLAP_PLUGIN_FEATURE_SYNTHESIZER,
+    c.CLAP_PLUGIN_FEATURE_STEREO,
     null,
 };
 
 // ---Plugin Class---
 
-const plugin_class: clap.clap_plugin_t = .{
+const plugin_class: c.clap_plugin_t = .{
     .desc = &plugin_descriptor,
     .plugin_data = null,
     .init = initPlugin,
@@ -109,20 +108,20 @@ const plugin_class: clap.clap_plugin_t = .{
     .on_main_thread = onMainThread,
 };
 
-fn initPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) bool {
+fn initPlugin(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) bool {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
     _ = plugin;
     return true;
 }
 
-fn destroyPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) void {
+fn destroyPlugin(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) void {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
     plugin.deinit();
     c.free(plugin);
 }
 
 fn activatePlugin(
-    clap_plugin: [*c]const clap.clap_plugin_t,
+    clap_plugin: [*c]const c.clap_plugin_t,
     sample_rate: f64,
     min_frames_count: u32,
     max_frames_count: u32,
@@ -136,31 +135,31 @@ fn activatePlugin(
     return true;
 }
 
-fn deactivatePlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) void {
+fn deactivatePlugin(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) void {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
     _ = plugin;
 }
 
-fn startProcessingPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) bool {
+fn startProcessingPlugin(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) bool {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
     _ = plugin;
     return true;
 }
 
-fn stopProcessingPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) void {
+fn stopProcessingPlugin(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) void {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
     _ = plugin;
 }
 
-fn resetPlugin(clap_plugin: [*c]const clap.clap_plugin_t) callconv(.c) void {
+fn resetPlugin(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) void {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
     _ = plugin;
 }
 
 fn processPlugin(
-    clap_plugin: [*c]const clap.clap_plugin_t,
-    process: [*c]const clap.clap_process_t,
-) callconv(.c) clap.clap_process_status {
+    clap_plugin: [*c]const c.clap_plugin_t,
+    process: [*c]const c.clap_process_t,
+) callconv(.c) c.clap_process_status {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
     std.debug.assert(process.*.audio_inputs_count == 0);
@@ -196,47 +195,47 @@ fn processPlugin(
         i = next_event_frame;
     }
 
-    return clap.CLAP_PROCESS_CONTINUE;
+    return c.CLAP_PROCESS_CONTINUE;
 }
 
 fn getExtension(
-    _: [*c]const clap.clap_plugin_t,
+    _: [*c]const c.clap_plugin_t,
     id: [*c]const u8,
 ) callconv(.c) ?*const anyopaque {
-    if (0 == c.strcmp(id, &clap.CLAP_EXT_NOTE_PORTS)) return &extension_note_ports;
-    if (0 == c.strcmp(id, &clap.CLAP_EXT_AUDIO_PORTS)) return &extension_audio_ports;
-    if (0 == c.strcmp(id, &clap.CLAP_EXT_PARAMS)) return &extension_params;
-    if (0 == c.strcmp(id, &clap.CLAP_EXT_STATE)) return &extension_plugin_state;
+    if (0 == c.strcmp(id, &c.CLAP_EXT_NOTE_PORTS)) return &extension_note_ports;
+    if (0 == c.strcmp(id, &c.CLAP_EXT_AUDIO_PORTS)) return &extension_audio_ports;
+    if (0 == c.strcmp(id, &c.CLAP_EXT_PARAMS)) return &extension_params;
+    if (0 == c.strcmp(id, &c.CLAP_EXT_STATE)) return &extension_plugin_state;
 
     return null;
 }
 
-fn onMainThread(_: [*c]const clap.clap_plugin_t) callconv(.c) void {
+fn onMainThread(_: [*c]const c.clap_plugin_t) callconv(.c) void {
     //
 }
 
 // ---Extensions---
 
-const extension_note_ports: clap.clap_plugin_note_ports_t = .{
+const extension_note_ports: c.clap_plugin_note_ports_t = .{
     .count = notePortsCount,
     .get = getNotePorts,
 };
 
-fn notePortsCount(_: [*c]const clap.clap_plugin_t, is_input: bool) callconv(.c) u32 {
+fn notePortsCount(_: [*c]const c.clap_plugin_t, is_input: bool) callconv(.c) u32 {
     return if (is_input) 1 else 0;
 }
 
 fn getNotePorts(
-    _: [*c]const clap.clap_plugin_t,
+    _: [*c]const c.clap_plugin_t,
     index: u32,
     is_input: bool,
-    info: [*c]clap.clap_note_port_info_t,
+    info: [*c]c.clap_note_port_info_t,
 ) callconv(.c) bool {
     if (!is_input or index != 0) return false;
 
     info.*.id = 0;
-    info.*.supported_dialects = clap.CLAP_NOTE_DIALECT_CLAP;
-    info.*.preferred_dialect = clap.CLAP_NOTE_DIALECT_CLAP;
+    info.*.supported_dialects = c.CLAP_NOTE_DIALECT_CLAP;
+    info.*.preferred_dialect = c.CLAP_NOTE_DIALECT_CLAP;
     _ = std.mem.printSentinel(
         &info.*.name,
         "Note Port",
@@ -247,28 +246,28 @@ fn getNotePorts(
     return true;
 }
 
-const extension_audio_ports: clap.clap_plugin_audio_ports_t = .{
+const extension_audio_ports: c.clap_plugin_audio_ports_t = .{
     .count = audioPortsCount,
     .get = getAudioPorts,
 };
 
-fn audioPortsCount(_: [*c]const clap.clap_plugin_t, is_input: bool) callconv(.c) u32 {
+fn audioPortsCount(_: [*c]const c.clap_plugin_t, is_input: bool) callconv(.c) u32 {
     return if (is_input) 0 else 1;
 }
 
 fn getAudioPorts(
-    _: [*c]const clap.clap_plugin_t,
+    _: [*c]const c.clap_plugin_t,
     index: u32,
     is_input: bool,
-    info: [*c]clap.clap_audio_port_info_t,
+    info: [*c]c.clap_audio_port_info_t,
 ) callconv(.c) bool {
     if (is_input or index != 0) return false;
 
     info.*.id = 0;
     info.*.channel_count = 2;
-    info.*.flags = clap.CLAP_AUDIO_PORT_IS_MAIN;
-    info.*.port_type = &clap.CLAP_PORT_STEREO;
-    info.*.in_place_pair = clap.CLAP_INVALID_ID;
+    info.*.flags = c.CLAP_AUDIO_PORT_IS_MAIN;
+    info.*.port_type = &c.CLAP_PORT_STEREO;
+    info.*.in_place_pair = c.CLAP_INVALID_ID;
     _ = std.mem.printSentinel(
         &info.*.name,
         "Audio Output",
@@ -279,7 +278,7 @@ fn getAudioPorts(
     return true;
 }
 
-const extension_params: clap.clap_plugin_params_t = .{
+const extension_params: c.clap_plugin_params_t = .{
     .count = extParamCount,
     .get_info = extParamGetInfo,
     .get_value = extParamGetValue,
@@ -288,20 +287,20 @@ const extension_params: clap.clap_plugin_params_t = .{
     .flush = extParamFlush,
 };
 
-fn extParamCount(_: [*c]const clap.clap_plugin_t) callconv(.c) u32 {
+fn extParamCount(_: [*c]const c.clap_plugin_t) callconv(.c) u32 {
     return MyPlugin.parameter_count;
 }
 
 fn extParamGetInfo(
-    _: [*c]const clap.clap_plugin_t,
+    _: [*c]const c.clap_plugin_t,
     index: u32,
-    info: [*c]clap.clap_param_info_t,
+    info: [*c]c.clap_param_info_t,
 ) callconv(.c) bool {
     if (index != @backingInt(MyPlugin.ParameterIndex.volume)) return false;
 
-    info.* = std.mem.zeroes(clap.clap_param_info_t);
+    info.* = std.mem.zeroes(c.clap_param_info_t);
     info.*.id = index;
-    info.*.flags = clap.CLAP_PARAM_IS_AUTOMATABLE; // | clap.CLAP_PARAM_IS_MODULATABLE;
+    info.*.flags = c.CLAP_PARAM_IS_AUTOMATABLE; // | clap.CLAP_PARAM_IS_MODULATABLE;
     info.*.min_value = 0.0;
     info.*.max_value = 1.0;
     info.*.default_value = 0.5;
@@ -316,7 +315,7 @@ fn extParamGetInfo(
 }
 
 /// This will be called on the main thread, so we need to communicate this info to the audio thread
-fn extParamGetValue(clap_plugin: [*c]const clap.clap_plugin_t, index: u32, value: [*c]f64) callconv(.c) bool {
+fn extParamGetValue(clap_plugin: [*c]const c.clap_plugin_t, index: u32, value: [*c]f64) callconv(.c) bool {
     if (index >= MyPlugin.parameter_count) return false;
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
@@ -328,8 +327,8 @@ fn extParamGetValue(clap_plugin: [*c]const clap.clap_plugin_t, index: u32, value
 }
 
 fn extParamValueToText(
-    _: [*c]const clap.clap_plugin_t,
-    id: clap.clap_id,
+    _: [*c]const c.clap_plugin_t,
+    id: c.clap_id,
     value: f64,
     display: [*c]u8,
     size: u32,
@@ -341,8 +340,8 @@ fn extParamValueToText(
 }
 
 fn extParamTextToValue(
-    _: [*c]const clap.clap_plugin_t,
-    id: clap.clap_id,
+    _: [*c]const c.clap_plugin_t,
+    id: c.clap_id,
     display: [*c]const u8,
     value: [*c]f64,
 ) callconv(.c) bool {
@@ -354,9 +353,9 @@ fn extParamTextToValue(
 }
 
 fn extParamFlush(
-    clap_plugin: [*c]const clap.clap_plugin_t,
-    in: [*c]const clap.clap_input_events_t,
-    out: [*c]const clap.clap_output_events_t,
+    clap_plugin: [*c]const c.clap_plugin_t,
+    in: [*c]const c.clap_input_events_t,
+    out: [*c]const c.clap_output_events_t,
 ) callconv(.c) void {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
     const event_count = in.*.size.?(in);
@@ -367,14 +366,14 @@ fn extParamFlush(
     }
 }
 
-const extension_plugin_state: clap.clap_plugin_state_t = .{
+const extension_plugin_state: c.clap_plugin_state_t = .{
     .save = extStateSave,
     .load = extStateLoad,
 };
 
 fn extStateSave(
-    clap_plugin: [*c]const clap.clap_plugin_t,
-    stream: [*c]const clap.clap_ostream_t,
+    clap_plugin: [*c]const c.clap_plugin_t,
+    stream: [*c]const c.clap_ostream_t,
 ) callconv(.c) bool {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
@@ -388,8 +387,8 @@ fn extStateSave(
 }
 
 fn extStateLoad(
-    clap_plugin: [*c]const clap.clap_plugin_t,
-    stream: [*c]const clap.clap_istream_t,
+    clap_plugin: [*c]const c.clap_plugin_t,
+    stream: [*c]const c.clap_istream_t,
 ) callconv(.c) bool {
     const plugin: *MyPlugin = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
@@ -421,8 +420,8 @@ const MyPlugin = struct {
     io: std.Io,
     io_impl: std.Io.Threaded,
 
-    plugin: clap.clap_plugin_t,
-    host: *const clap.clap_host_t,
+    plugin: c.clap_plugin_t,
+    host: *const c.clap_host_t,
 
     sample_rate: f32,
     voices: std.ArrayList(Voice),
@@ -436,8 +435,8 @@ const MyPlugin = struct {
 
     fn init(
         self: *@This(),
-        clap_plugin: clap.clap_plugin_t,
-        host: *const clap.clap_host_t,
+        clap_plugin: c.clap_plugin_t,
+        host: *const c.clap_host_t,
     ) void {
         self.allocator = std.heap.smp_allocator;
         self.io_impl = .init_single_threaded;
@@ -450,7 +449,7 @@ const MyPlugin = struct {
         self.voices = .initBuffer(&self.voices_buffer);
 
         for (0..parameter_count) |i| {
-            var info = std.mem.zeroes(clap.clap_param_info_t);
+            var info = std.mem.zeroes(c.clap_param_info_t);
             _ = extension_params.get_info.?(&self.plugin, @intCast(i), &info);
             self.parameters[i] = @floatCast(info.default_value);
             self.parameters_main[i] = @floatCast(info.default_value);
@@ -464,18 +463,18 @@ const MyPlugin = struct {
         self.io_impl.deinit();
     }
 
-    fn processEvent(self: *@This(), event: *const clap.clap_event_header_t) void {
-        if (event.space_id != clap.CLAP_CORE_EVENT_SPACE_ID) return;
+    fn processEvent(self: *@This(), event: *const c.clap_event_header_t) void {
+        if (event.space_id != c.CLAP_CORE_EVENT_SPACE_ID) return;
 
         if (isNoteEventClap(event.type)) {
             self.handleNoteEvent(event);
-        } else if (event.type == clap.CLAP_EVENT_PARAM_VALUE) {
+        } else if (event.type == c.CLAP_EVENT_PARAM_VALUE) {
             self.handleParamValueEvent(event);
         }
     }
 
-    fn handleNoteEvent(self: *@This(), event: *const clap.clap_event_header_t) void {
-        const note_event: *const clap.clap_event_note_t = @ptrCast(@alignCast(event));
+    fn handleNoteEvent(self: *@This(), event: *const c.clap_event_header_t) void {
+        const note_event: *const c.clap_event_note_t = @ptrCast(@alignCast(event));
 
         var i = self.voices.items.len;
         while (i > 0) {
@@ -490,7 +489,7 @@ const MyPlugin = struct {
             }
         }
 
-        if (event.type == clap.CLAP_EVENT_NOTE_ON and self.voices.items.len < self.voices.capacity) {
+        if (event.type == c.CLAP_EVENT_NOTE_ON and self.voices.items.len < self.voices.capacity) {
             self.voices.appendAssumeCapacity(.{
                 .held = true,
                 .note_id = note_event.note_id,
@@ -501,8 +500,8 @@ const MyPlugin = struct {
         }
     }
 
-    fn handleParamValueEvent(self: *@This(), event: *const clap.clap_event_header_t) void {
-        const value_event: *const clap.clap_event_param_value_t = @ptrCast(@alignCast(event));
+    fn handleParamValueEvent(self: *@This(), event: *const c.clap_event_header_t) void {
+        const value_event: *const c.clap_event_param_value_t = @ptrCast(@alignCast(event));
         const i = value_event.param_id;
 
         self.parameter_mutex.lockUncancelable(self.io);
@@ -512,7 +511,7 @@ const MyPlugin = struct {
         self.changed[i] = true;
     }
 
-    fn syncMainToAudio(self: *@This(), out: [*c]const clap.clap_output_events_t) void {
+    fn syncMainToAudio(self: *@This(), out: [*c]const c.clap_output_events_t) void {
         self.parameter_mutex.lockUncancelable(self.io);
         defer self.parameter_mutex.unlock(self.io);
 
@@ -522,12 +521,12 @@ const MyPlugin = struct {
             self.parameters[i] = self.parameters_main[i];
             self.changed_main[i] = false;
 
-            const event: clap.clap_event_param_value_t = .{
+            const event: c.clap_event_param_value_t = .{
                 .header = .{
-                    .size = @sizeOf(clap.clap_event_param_value_t),
+                    .size = @sizeOf(c.clap_event_param_value_t),
                     .time = 0,
-                    .space_id = clap.CLAP_CORE_EVENT_SPACE_ID,
-                    .type = clap.CLAP_EVENT_PARAM_VALUE,
+                    .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
+                    .type = c.CLAP_EVENT_PARAM_VALUE,
                     .flags = 0,
                 },
                 .param_id = @intCast(i),
@@ -568,9 +567,9 @@ const MyPlugin = struct {
 
 fn isNoteEventClap(event_type: u16) bool {
     return switch (event_type) {
-        clap.CLAP_EVENT_NOTE_ON => true,
-        clap.CLAP_EVENT_NOTE_OFF => true,
-        clap.CLAP_EVENT_NOTE_CHOKE => true,
+        c.CLAP_EVENT_NOTE_ON => true,
+        c.CLAP_EVENT_NOTE_OFF => true,
+        c.CLAP_EVENT_NOTE_CHOKE => true,
         else => false,
     };
 }
@@ -580,7 +579,7 @@ test {
     my_plugin.init(plugin_class, undefined);
     defer my_plugin.deinit();
 
-    var clap_process = std.mem.zeroes(clap.clap_process_t);
+    var clap_process = std.mem.zeroes(c.clap_process_t);
     clap_process.audio_outputs_count = 1;
     clap_process.in_events = dbg.initDummyInputEvents();
 
