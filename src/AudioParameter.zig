@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("c");
 
-const Flags = enum(usize) {
+pub const Flags = enum(usize) {
     IsStepped = c.CLAP_PARAM_IS_STEPPED,
     IsPeriodic = c.CLAP_PARAM_IS_PERIODIC,
     IsHidden = c.CLAP_PARAM_IS_HIDDEN,
@@ -28,4 +28,28 @@ min_value: f64,
 max_value: f64,
 default_value: f64,
 
-current_value: f64 = 0.0,
+value: std.atomic.Value(f64),
+
+pub fn init(id: u32, name: []const u8, min_value: f64, max_value: f64, default_value: f64) @This() {
+    return .{
+        .id = id,
+        .flags = @backingInt(Flags.IsAutomatable),
+        .name = name,
+        .min_value = min_value,
+        .max_value = max_value,
+        .default_value = default_value,
+        .value = .init(default_value),
+    };
+}
+
+pub fn setValueUnchecked(self: *@This(), value: f64) void {
+    self.value.store(value, .unordered);
+}
+
+pub fn setValue(self: *@This(), value: u64) void {
+    self.setValueUnchecked(std.math.clamp(value, self.min_value, self.max_value));
+}
+
+pub fn getValue(self: *const @This()) f64 {
+    return self.value.load(.unordered);
+}
