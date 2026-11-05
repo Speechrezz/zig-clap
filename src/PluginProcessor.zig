@@ -11,7 +11,7 @@ pub fn init(allocator: std.mem.Allocator, _: std.Io) !@This() {
         "Volume",
         0.0,
         1.0,
-        1.0,
+        0.5,
     ));
 
     return proc;

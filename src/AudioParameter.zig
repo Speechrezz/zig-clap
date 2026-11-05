@@ -46,7 +46,7 @@ pub fn setValueUnchecked(self: *@This(), value: f64) void {
     self.value.store(value, .unordered);
 }
 
-pub fn setValue(self: *@This(), value: u64) void {
+pub fn setValue(self: *@This(), value: f64) void {
     self.setValueUnchecked(std.math.clamp(value, self.min_value, self.max_value));
 }
 

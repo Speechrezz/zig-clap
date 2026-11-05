@@ -293,27 +293,31 @@ const extension_params: c.clap_plugin_params_t = .{
     .flush = extParamFlush,
 };
 
-fn extParamCount(_: [*c]const c.clap_plugin_t) callconv(.c) u32 {
-    return ClapProcessor.parameter_count;
+fn extParamCount(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) u32 {
+    const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+    return @intCast(plugin.processor.params.items.len);
 }
 
 fn extParamGetInfo(
-    _: [*c]const c.clap_plugin_t,
+    clap_plugin: [*c]const c.clap_plugin_t,
     index: u32,
     info: [*c]c.clap_param_info_t,
 ) callconv(.c) bool {
-    if (index != @backingInt(ClapProcessor.ParameterIndex.volume)) return false;
+    const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+    if (index >= plugin.processor.params.items.len) return false;
+
+    const param = &plugin.processor.params.items[index];
 
     info.* = std.mem.zeroes(c.clap_param_info_t);
     info.*.id = index;
     info.*.flags = c.CLAP_PARAM_IS_AUTOMATABLE; // | clap.CLAP_PARAM_IS_MODULATABLE;
-    info.*.min_value = 0.0;
-    info.*.max_value = 1.0;
-    info.*.default_value = 0.5;
+    info.*.min_value = param.min_value;
+    info.*.max_value = param.max_value;
+    info.*.default_value = param.default_value;
     _ = std.mem.printSentinel(
         &info.*.name,
-        "Volume",
-        .{},
+        "{s}",
+        .{param.name},
         0,
     ) catch return false;
 
@@ -322,26 +326,24 @@ fn extParamGetInfo(
 
 /// This will be called on the main thread, so we need to communicate this info to the audio thread
 fn extParamGetValue(clap_plugin: [*c]const c.clap_plugin_t, index: u32, value: [*c]f64) callconv(.c) bool {
-    if (index >= ClapProcessor.parameter_count) return false;
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+    if (index >= plugin.processor.params.items.len) return false;
 
-    plugin.parameter_mutex.lockUncancelable(plugin.io);
-    defer plugin.parameter_mutex.unlock(plugin.io);
-
-    value.* = @floatCast(if (plugin.changed_main[index]) plugin.parameters_main[index] else plugin.parameters[index]);
+    value.* = plugin.processor.params.items[index].getValue();
     return true;
 }
 
 fn extParamValueToText(
-    _: [*c]const c.clap_plugin_t,
+    clap_plugin: [*c]const c.clap_plugin_t,
     id: c.clap_id,
     value: f64,
     display: [*c]u8,
     size: u32,
 ) callconv(.c) bool {
-    if (id >= ClapProcessor.parameter_count) return false;
+    const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+    if (id >= plugin.processor.params.items.len) return false;
 
-    _ = std.mem.printSentinel(display[0..size], "{}", .{value}, 0) catch return false;
+    _ = std.mem.printSentinel(display[0..size], "{:.2}", .{value}, 0) catch return false;
     return true;
 }
 
@@ -383,12 +385,18 @@ fn extStateSave(
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-    plugin.parameter_mutex.lockUncancelable(plugin.io);
-    defer plugin.parameter_mutex.unlock(plugin.io);
+    // TODO: Move the serialization logic to ClapProcessor
+    const param_count = plugin.processor.params.items.len;
 
-    const byte_count = @sizeOf(@TypeOf(plugin.parameters));
+    const buffer = plugin.allocator.alloc(f64, param_count) catch return false;
+    defer plugin.allocator.free(buffer);
 
-    const result = stream.*.write.?(stream, &plugin.parameters, byte_count);
+    for (plugin.processor.params.items, buffer) |*param, *out| {
+        out.* = param.getValue();
+    }
+
+    const byte_count = @sizeOf(f64) * param_count;
+    const result = stream.*.write.?(stream, buffer.ptr, byte_count);
     return result == byte_count;
 }
 
@@ -398,13 +406,22 @@ fn extStateLoad(
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-    plugin.parameter_mutex.lockUncancelable(plugin.io);
-    defer plugin.parameter_mutex.unlock(plugin.io);
+    // TODO: Move the serialization logic to ClapProcessor
+    const param_count = plugin.processor.params.items.len;
 
-    const byte_count = @sizeOf(@TypeOf(plugin.parameters));
+    const buffer = plugin.allocator.alloc(f64, param_count) catch return false;
+    defer plugin.allocator.free(buffer);
 
-    const result = stream.*.read.?(stream, &plugin.parameters, byte_count);
-    return result == byte_count;
+    const byte_count = @sizeOf(f64) * param_count;
+
+    const result = stream.*.read.?(stream, buffer.ptr, byte_count);
+    if (result != byte_count) return false;
+
+    for (plugin.processor.params.items, buffer) |*param, value| {
+        param.setValue(value);
+    }
+
+    return true;
 }
 
 test {

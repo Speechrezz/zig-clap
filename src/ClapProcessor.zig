@@ -18,8 +18,6 @@ const Voice = struct {
 };
 
 const max_voices = 8;
-pub const ParameterIndex = enum { volume, COUNT };
-pub const parameter_count = std.enums.values(ParameterIndex).len;
 
 safe_allocator: if (use_safe_allocator) std.heap.SafeAllocator else void,
 allocator: std.mem.Allocator,
@@ -34,12 +32,6 @@ host: *const c.clap_host_t,
 sample_rate: f32,
 voices: std.ArrayList(Voice),
 voices_buffer: [max_voices]Voice = undefined,
-
-parameters: [parameter_count]f32,
-parameters_main: [parameter_count]f32,
-changed: [parameter_count]bool,
-changed_main: [parameter_count]bool,
-parameter_mutex: std.Io.Mutex,
 
 pub fn init(
     self: *@This(),
@@ -63,18 +55,6 @@ pub fn init(
     self.processor = try .init(self.allocator, self.io);
 
     self.voices = .initBuffer(&self.voices_buffer);
-
-    for (0..parameter_count) |i| {
-        // var info = std.mem.zeroes(c.clap_param_info_t);
-        // _ = extension_params.get_info.?(&self.clap_plugin, @intCast(i), &info);
-        // self.parameters[i] = @floatCast(info.default_value);
-        // self.parameters_main[i] = @floatCast(info.default_value);
-        self.parameters[i] = @floatCast(1.0);
-        self.parameters_main[i] = @floatCast(1.0);
-    }
-    self.changed = @splat(false);
-    self.changed_main = @splat(false);
-    self.parameter_mutex = .init;
 }
 
 pub fn deinit(self: *@This()) void {
@@ -128,46 +108,39 @@ fn handleParamValueEvent(self: *@This(), event: *const c.clap_event_header_t) vo
     const value_event: *const c.clap_event_param_value_t = @ptrCast(@alignCast(event));
     const i = value_event.param_id;
 
-    self.parameter_mutex.lockUncancelable(self.io);
-    defer self.parameter_mutex.unlock(self.io);
-
-    self.parameters[i] = @floatCast(value_event.value);
-    self.changed[i] = true;
+    self.processor.params.items[i].setValue(value_event.value);
 }
 
 pub fn syncMainToAudio(self: *@This(), out: [*c]const c.clap_output_events_t) void {
-    self.parameter_mutex.lockUncancelable(self.io);
-    defer self.parameter_mutex.unlock(self.io);
+    _ = out;
 
-    for (0..parameter_count) |i| {
-        if (self.changed_main[i] == false) continue;
+    for (0..self.processor.params.items.len) |i| {
+        _ = i;
+        // TODO: Check if parameter was changed via main thread using a dirty flag
 
-        self.parameters[i] = self.parameters_main[i];
-        self.changed_main[i] = false;
+        // const event: c.clap_event_param_value_t = .{
+        //     .header = .{
+        //         .size = @sizeOf(c.clap_event_param_value_t),
+        //         .time = 0,
+        //         .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
+        //         .type = c.CLAP_EVENT_PARAM_VALUE,
+        //         .flags = 0,
+        //     },
+        //     .param_id = @intCast(i),
+        //     .cookie = null,
+        //     .note_id = -1,
+        //     .port_index = -1,
+        //     .channel = -1,
+        //     .key = -1,
+        //     .value = self.parameters[i],
+        // };
 
-        const event: c.clap_event_param_value_t = .{
-            .header = .{
-                .size = @sizeOf(c.clap_event_param_value_t),
-                .time = 0,
-                .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
-                .type = c.CLAP_EVENT_PARAM_VALUE,
-                .flags = 0,
-            },
-            .param_id = @intCast(i),
-            .cookie = null,
-            .note_id = -1,
-            .port_index = -1,
-            .channel = -1,
-            .key = -1,
-            .value = self.parameters[i],
-        };
-
-        _ = out.*.try_push.?(out, &event.header);
+        // _ = out.*.try_push.?(out, &event.header);
     }
 }
 
 pub fn renderAudio(self: *@This(), start: u32, end: u32, outputL: [*]f32, outputR: [*]f32) void {
-    const volume = self.parameters[@backingInt(ParameterIndex.volume)];
+    const volume: f32 = @floatCast(self.processor.params.items[0].getValue());
 
     var i: u32 = start;
     while (i < end) : (i += 1) {
