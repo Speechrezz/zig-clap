@@ -6,6 +6,7 @@ const framework = @import("framework/framework.zig");
 const midi = framework.midi;
 
 const PluginProcessor = @import("PluginProcessor.zig");
+const AudioParameter = @import("AudioParameter.zig");
 
 const use_safe_allocator = switch (builtin.mode) {
     .debug, .safe => true,
@@ -58,6 +59,38 @@ pub fn deinit(self: *@This()) void {
     self.io_impl.deinit();
 }
 
+pub fn getParamCount(self: *const @This()) u32 {
+    return @intCast(self.processor.params.items.len);
+}
+
+pub fn getParamAtIndex(self: *const @This(), index: u32) ?*AudioParameter {
+    if (index >= self.processor.params.items.len) return null;
+    return &self.processor.params.items[index];
+}
+
+pub fn getParamWithId(self: *const @This(), id: u32) ?*AudioParameter {
+    return self.getParamAtIndex(id);
+}
+
+pub fn prepare(self: *@This(), sample_rate: f64, min_frames_count: u32, max_frames_count: u32) !void {
+    _ = min_frames_count;
+
+    try self.processor.prepare(self.allocator, .{
+        .sample_rate = sample_rate,
+        .num_channels = 2,
+        .block_size = max_frames_count,
+    });
+}
+
+fn isNoteEventClap(event_type: u16) bool {
+    return switch (event_type) {
+        c.CLAP_EVENT_NOTE_ON => true,
+        c.CLAP_EVENT_NOTE_OFF => true,
+        c.CLAP_EVENT_NOTE_CHOKE => true,
+        else => false,
+    };
+}
+
 pub fn processEvent(self: *@This(), event: *const c.clap_event_header_t) !void {
     if (event.space_id != c.CLAP_CORE_EVENT_SPACE_ID) return;
 
@@ -86,33 +119,6 @@ fn handleNoteEvent(self: *@This(), event: *const c.clap_event_header_t) !void {
     }
 
     try self.note_events.append(self.allocator, note_event);
-}
-
-fn handleNoteEventOld(self: *@This(), event: *const c.clap_event_header_t) void {
-    const note_event: *const c.clap_event_note_t = @ptrCast(@alignCast(event));
-
-    var i = self.voices.items.len;
-    while (i > 0) {
-        i -= 1;
-        const voice = &self.voices.items[i];
-
-        const key_match = note_event.key == -1 or note_event.key == voice.key;
-        const id_match = note_event.note_id == -1 or note_event.note_id == voice.note_id;
-        const channel_match = note_event.channel == -1 or note_event.channel == voice.channel;
-        if (key_match and id_match and channel_match) {
-            _ = self.voices.orderedRemove(i);
-        }
-    }
-
-    if (event.type == c.CLAP_EVENT_NOTE_ON and self.voices.items.len < self.voices.capacity) {
-        self.voices.appendAssumeCapacity(.{
-            .held = true,
-            .note_id = note_event.note_id,
-            .channel = note_event.channel,
-            .key = note_event.key,
-            .phase = 0.0,
-        });
-    }
 }
 
 fn handleParamValueEvent(self: *@This(), event: *const c.clap_event_header_t) void {
@@ -161,11 +167,38 @@ pub fn processBlock(self: *@This(), start: u32, end: u32, channels: [][*]f32) vo
     self.processor.process(audio_slice, self.note_events.items);
 }
 
-fn isNoteEventClap(event_type: u16) bool {
-    return switch (event_type) {
-        c.CLAP_EVENT_NOTE_ON => true,
-        c.CLAP_EVENT_NOTE_OFF => true,
-        c.CLAP_EVENT_NOTE_CHOKE => true,
-        else => false,
-    };
+pub fn saveState(self: *@This(), stream: *const c.clap_ostream_t) !void {
+    const param_count = self.processor.params.items.len;
+
+    const buffer = try self.allocator.alloc(f64, param_count);
+    defer self.allocator.free(buffer);
+
+    for (self.processor.params.items, buffer) |*param, *out| {
+        out.* = param.getValue();
+    }
+
+    const byte_count = @sizeOf(f64) * param_count;
+    const result = stream.*.write.?(stream, buffer.ptr, byte_count);
+
+    if (result != byte_count) {
+        return std.mem.Allocator.Error.OutOfMemory;
+    }
+}
+
+pub fn loadState(self: *@This(), stream: *const c.clap_istream_t) !void {
+    const param_count = self.processor.params.items.len;
+
+    const buffer = try self.allocator.alloc(f64, param_count);
+    defer self.allocator.free(buffer);
+
+    const byte_count = @sizeOf(f64) * param_count;
+
+    const result = stream.*.read.?(stream, buffer.ptr, byte_count);
+    if (result != byte_count) {
+        return std.mem.Allocator.Error.OutOfMemory;
+    }
+
+    for (self.processor.params.items, buffer) |*param, value| {
+        param.setValue(value);
+    }
 }

@@ -36,11 +36,11 @@ pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
     self.params.deinit(allocator);
 }
 
-pub fn prepare(self: *@This(), allocator: std.mem.Allocator, sample_rate: f64) !void {
+pub fn prepare(self: *@This(), allocator: std.mem.Allocator, spec: framework.audio.ProcessSpec) !void {
     _ = allocator;
     // TODO
 
-    self.sample_rate = @floatCast(sample_rate);
+    self.sample_rate = @floatCast(spec.sample_rate);
 }
 
 pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.NoteEvent) void {

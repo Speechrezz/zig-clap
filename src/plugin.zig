@@ -133,10 +133,8 @@ fn activatePlugin(
     max_frames_count: u32,
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-    _ = min_frames_count;
-    _ = max_frames_count;
 
-    plugin.processor.prepare(plugin.allocator, sample_rate) catch false;
+    plugin.prepare(sample_rate, min_frames_count, max_frames_count) catch false;
     return true;
 }
 
@@ -281,7 +279,7 @@ const extension_params: c.clap_plugin_params_t = .{
 
 fn extParamCount(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) u32 {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-    return @intCast(plugin.processor.params.items.len);
+    return plugin.getParamCount();
 }
 
 fn extParamGetInfo(
@@ -290,13 +288,11 @@ fn extParamGetInfo(
     info: [*c]c.clap_param_info_t,
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-    if (index >= plugin.processor.params.items.len) return false;
-
-    const param = &plugin.processor.params.items[index];
+    const param = plugin.getParamAtIndex(index) orelse return false;
 
     info.* = std.mem.zeroes(c.clap_param_info_t);
-    info.*.id = index;
-    info.*.flags = c.CLAP_PARAM_IS_AUTOMATABLE; // | clap.CLAP_PARAM_IS_MODULATABLE;
+    info.*.id = param.id;
+    info.*.flags = param.flags;
     info.*.min_value = param.min_value;
     info.*.max_value = param.max_value;
     info.*.default_value = param.default_value;
@@ -313,9 +309,9 @@ fn extParamGetInfo(
 /// This will be called on the main thread, so we need to communicate this info to the audio thread
 fn extParamGetValue(clap_plugin: [*c]const c.clap_plugin_t, index: u32, value: [*c]f64) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-    if (index >= plugin.processor.params.items.len) return false;
+    const param = plugin.getParamAtIndex(index) orelse return false;
 
-    value.* = plugin.processor.params.items[index].getValue();
+    value.* = param.getValue();
     return true;
 }
 
@@ -327,7 +323,8 @@ fn extParamValueToText(
     size: u32,
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-    if (id >= plugin.processor.params.items.len) return false;
+    const param = plugin.getParamWithId(id) orelse return false;
+    _ = param; // TODO
 
     _ = std.mem.printSentinel(display[0..size], "{:.2}", .{value}, 0) catch return false;
     return true;
@@ -371,19 +368,8 @@ fn extStateSave(
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-    // TODO: Move the serialization logic to ClapProcessor
-    const param_count = plugin.processor.params.items.len;
-
-    const buffer = plugin.allocator.alloc(f64, param_count) catch return false;
-    defer plugin.allocator.free(buffer);
-
-    for (plugin.processor.params.items, buffer) |*param, *out| {
-        out.* = param.getValue();
-    }
-
-    const byte_count = @sizeOf(f64) * param_count;
-    const result = stream.*.write.?(stream, buffer.ptr, byte_count);
-    return result == byte_count;
+    plugin.saveState(@ptrCast(stream)) catch return false;
+    return true;
 }
 
 fn extStateLoad(
@@ -392,21 +378,7 @@ fn extStateLoad(
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-    // TODO: Move the serialization logic to ClapProcessor
-    const param_count = plugin.processor.params.items.len;
-
-    const buffer = plugin.allocator.alloc(f64, param_count) catch return false;
-    defer plugin.allocator.free(buffer);
-
-    const byte_count = @sizeOf(f64) * param_count;
-
-    const result = stream.*.read.?(stream, buffer.ptr, byte_count);
-    if (result != byte_count) return false;
-
-    for (plugin.processor.params.items, buffer) |*param, value| {
-        param.setValue(value);
-    }
-
+    plugin.loadState(@ptrCast(stream)) catch return false;
     return true;
 }
 

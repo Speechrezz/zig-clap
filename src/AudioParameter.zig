@@ -22,7 +22,7 @@ pub const Flags = enum(usize) {
 };
 
 id: u32,
-flags: usize = 0,
+flags: u32 = 0,
 name: []const u8,
 min_value: f64,
 max_value: f64,
