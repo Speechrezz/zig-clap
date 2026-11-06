@@ -43,17 +43,6 @@ pub fn prepare(self: *@This(), allocator: std.mem.Allocator, sample_rate: f64) !
     self.sample_rate = @floatCast(sample_rate);
 }
 
-extern "kernel32" fn OutputDebugStringA(
-    str: [*:0]const u8,
-) callconv(.winapi) void;
-
-pub fn debugPrint(comptime fmt: []const u8, args: anytype) void {
-    var buffer: [4096]u8 = undefined;
-
-    const message = std.fmt.bufPrintSentinel(&buffer, fmt, args, 0) catch return;
-    OutputDebugStringA(message.ptr);
-}
-
 pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.NoteEvent) void {
     const volume: f32 = @floatCast(self.params.items[0].getValue());
 
@@ -62,7 +51,6 @@ pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.
         self.handleNoteEvent(note_event);
 
         const num_samples = note_event.sample - prev_sample;
-        debugPrint("prev_sample={}, num_samples={}, note_event={}\n", .{ prev_sample, num_samples, note_event });
         const slice = audio.createSubView(prev_sample, num_samples);
         self.renderBlock(slice, volume);
 
