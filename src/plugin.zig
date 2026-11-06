@@ -133,11 +133,10 @@ fn activatePlugin(
     max_frames_count: u32,
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-
-    plugin.sample_rate = @floatCast(sample_rate);
     _ = min_frames_count;
     _ = max_frames_count;
 
+    plugin.processor.prepare(plugin.allocator, sample_rate) catch false;
     return true;
 }
 
@@ -175,31 +174,18 @@ fn processPlugin(
 
     const frame_count = process.*.frames_count;
     const input_event_count = process.*.in_events.*.size.?(process.*.in_events);
-    var event_index: u32 = 0;
-    var next_event_frame: u32 = if (input_event_count > 0) 0 else frame_count;
 
     var i: u32 = 0;
-    while (i < frame_count) {
-        while (event_index < input_event_count and next_event_frame == i) {
-            const event = process.*.in_events.*.get.?(process.*.in_events, event_index);
-
-            if (event.*.time != i) {
-                next_event_frame = event.*.time;
-                break;
-            }
-
-            plugin.processEvent(event);
-            event_index += 1;
-
-            if (event_index == input_event_count) {
-                next_event_frame = frame_count;
-                break;
-            }
-        }
-
-        plugin.renderAudio(i, next_event_frame, process.*.audio_outputs[0].data32[0], process.*.audio_outputs[0].data32[1]);
-        i = next_event_frame;
+    while (i < input_event_count) : (i += 1) {
+        const event = process.*.in_events.*.get.?(process.*.in_events, i);
+        plugin.processEvent(event) catch return c.CLAP_PROCESS_ERROR;
     }
+
+    const audio_output = process.*.audio_outputs[0];
+    const channels = audio_output.data32[0..audio_output.channel_count];
+    plugin.processBlock(0, frame_count, @ptrCast(channels));
+
+    plugin.note_events.clearRetainingCapacity();
 
     return c.CLAP_PROCESS_CONTINUE;
 }
@@ -370,7 +356,7 @@ fn extParamFlush(
 
     plugin.syncMainToAudio(out);
     for (0..event_count) |i| {
-        plugin.processEvent(in.*.get.?(in, @intCast(i)));
+        plugin.processEvent(in.*.get.?(in, @intCast(i))) catch @panic("Out of memory");
     }
 }
 
@@ -425,12 +411,22 @@ fn extStateLoad(
 }
 
 test {
+    const allocator = std.testing.allocator;
+
     var my_plugin: ClapProcessor = undefined;
     try my_plugin.init(plugin_class, undefined);
     defer my_plugin.deinit();
 
+    var channels: [2][1]f32 = .{ .{0.0}, .{0.0} };
+
     var clap_process = std.mem.zeroes(c.clap_process_t);
+    clap_process.audio_outputs = try allocator.create(c.clap_audio_buffer_t);
+    defer allocator.destroy(&clap_process.audio_outputs[0]);
+
+    clap_process.frames_count = 0;
     clap_process.audio_outputs_count = 1;
+    clap_process.audio_outputs.*.channel_count = 2;
+    clap_process.audio_outputs.*.data32 = @ptrCast(@alignCast(&channels));
     clap_process.in_events = dbg.initDummyInputEvents();
 
     const plugin = &my_plugin.clap_plugin;

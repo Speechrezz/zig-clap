@@ -26,4 +26,5 @@ pub fn main(init: std.process.Init) !void {
 
 test {
     _ = @import("plugin.zig");
+    _ = @import("framework/framework.zig");
 }

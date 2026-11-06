@@ -56,11 +56,10 @@ pub fn build(b: *std.Build) void {
     plugin.root_module.addImport("c", translator.mod);
     plugin.root_module.link_libc = true;
 
-    const install_plugin = b.addInstallFileWithDir(
-        plugin.getEmittedBin(),
-        .bin,
-        "test2.clap",
-    );
+    const install_plugin = b.addInstallArtifact(plugin, .{
+        .dest_dir = .{ .override = .bin },
+        .dest_sub_path = "test2.clap",
+    });
 
     const clap_step = b.step("clap", "Build the CLAP plugin");
     clap_step.dependOn(&install_plugin.step);
