@@ -2,11 +2,13 @@ const std = @import("std");
 const builtin = @import("builtin");
 const c = @import("c");
 
-const framework = @import("framework/framework.zig");
-const midi = framework.midi;
+const audio = @import("../audio/audio.zig");
+const logging = @import("../logging/logging.zig");
+const midi = @import("../midi/midi.zig");
+const state = @import("../state/state.zig");
 
-const PluginProcessor = @import("PluginProcessor.zig");
-const AudioParameter = @import("AudioParameter.zig");
+const AudioParameter = audio.AudioParameter;
+const PluginProcessor = @import("../../PluginProcessor.zig");
 
 const use_safe_allocator = switch (builtin.mode) {
     .debug, .safe => true,
@@ -158,7 +160,7 @@ pub fn syncMainToAudio(self: *@This(), out: [*c]const c.clap_output_events_t) vo
 
 // pub fn processBlock(self: *@This(), start: u32, end: u32, outputL: [*]f32, outputR: [*]f32) void {
 pub fn processBlock(self: *@This(), start: u32, end: u32, channels: [][*]f32) void {
-    const audio_slice: framework.audio.AudioSlice = .{
+    const audio_slice: audio.AudioSlice = .{
         .channels = channels,
         .start_sample = start,
         .num_samples = end - start,
@@ -167,14 +169,14 @@ pub fn processBlock(self: *@This(), start: u32, end: u32, channels: [][*]f32) vo
     self.processor.process(audio_slice, self.note_events.items);
 }
 
-const BinaryStreamOut = framework.state.BinaryStreamOut;
+const BinaryStreamOut = state.BinaryStreamOut;
 
 pub fn saveState(self: *@This(), clap_stream: *const c.clap_ostream_t) bool {
     var stream: BinaryStreamOut = .init();
     defer stream.deinit(self.allocator);
 
     self.processor.saveState(self.allocator, &stream) catch |err| {
-        framework.logging.debugPrint("Error saving processor state: {}\n", .{err});
+        logging.debugPrint("Error saving processor state: {}\n", .{err});
         return false;
     };
 
@@ -183,7 +185,7 @@ pub fn saveState(self: *@This(), clap_stream: *const c.clap_ostream_t) bool {
     return result == buffer.len;
 }
 
-const BinaryStreamIn = framework.state.BinaryStreamIn;
+const BinaryStreamIn = state.BinaryStreamIn;
 
 pub fn loadState(self: *@This(), clap_stream: *const c.clap_istream_t) bool {
     const chunk_size = 256;

@@ -25,6 +25,7 @@ pub fn main(init: std.process.Init) !void {
 }
 
 test {
-    _ = @import("plugin.zig");
+    _ = @import("clap_api.zig");
     _ = @import("framework/framework.zig");
+    _ = @import("PluginProcessor.zig");
 }

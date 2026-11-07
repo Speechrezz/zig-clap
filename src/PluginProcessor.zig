@@ -1,6 +1,6 @@
 const std = @import("std");
 const framework = @import("framework/framework.zig");
-const AudioParameter = @import("AudioParameter.zig");
+const AudioParameter = framework.audio.AudioParameter;
 const AudioSlice = framework.audio.AudioSlice;
 
 const max_voices = 8;

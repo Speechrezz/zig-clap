@@ -1,9 +1,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const dbg = @import("debug_clap.zig");
+const dbg = @import("framework/clap/debug_clap.zig");
 const c = @import("c");
 
-const ClapProcessor = @import("ClapProcessor.zig");
+const ClapProcessor = @import("framework/clap/ClapProcessor.zig");
 
 const clap_version: c.clap_version_t = .{
     .major = c.CLAP_VERSION_MAJOR,
