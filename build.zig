@@ -47,7 +47,7 @@ pub fn build(b: *std.Build) void {
         .name = "test2",
         .linkage = .dynamic,
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/clap_api.zig"),
+            .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),

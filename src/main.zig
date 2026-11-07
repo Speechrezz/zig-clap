@@ -2,6 +2,8 @@ const std = @import("std");
 const Io = std.Io;
 
 const c = @import("c");
+const framework = @import("framework/framework.zig");
+const PluginProcessor = @import("PluginProcessor.zig");
 
 pub fn main(init: std.process.Init) !void {
     // Prints to stderr, unbuffered, ignoring potential errors.
@@ -24,8 +26,10 @@ pub fn main(init: std.process.Init) !void {
     });
 }
 
+const ClapApi = @import("framework/clap/clap_api.zig").ClapApi(PluginProcessor);
+export var clap_entry = ClapApi.clap_entry;
+
 test {
-    _ = @import("clap_api.zig");
-    _ = @import("framework/framework.zig");
-    _ = @import("PluginProcessor.zig");
+    _ = framework;
+    _ = PluginProcessor;
 }
