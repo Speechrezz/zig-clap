@@ -368,8 +368,7 @@ fn extStateSave(
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-    plugin.saveState(@ptrCast(stream)) catch return false;
-    return true;
+    return plugin.saveState(@ptrCast(stream));
 }
 
 fn extStateLoad(
@@ -378,8 +377,7 @@ fn extStateLoad(
 ) callconv(.c) bool {
     const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-    plugin.loadState(@ptrCast(stream)) catch return false;
-    return true;
+    return plugin.loadState(@ptrCast(stream));
 }
 
 test {

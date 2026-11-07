@@ -167,38 +167,41 @@ pub fn processBlock(self: *@This(), start: u32, end: u32, channels: [][*]f32) vo
     self.processor.process(audio_slice, self.note_events.items);
 }
 
-pub fn saveState(self: *@This(), stream: *const c.clap_ostream_t) !void {
-    const param_count = self.processor.params.items.len;
+const BinaryStreamOut = framework.state.BinaryStreamOut;
 
-    const buffer = try self.allocator.alloc(f64, param_count);
-    defer self.allocator.free(buffer);
+pub fn saveState(self: *@This(), clap_stream: *const c.clap_ostream_t) bool {
+    var stream: BinaryStreamOut = .init();
+    defer stream.deinit(self.allocator);
 
-    for (self.processor.params.items, buffer) |*param, *out| {
-        out.* = param.getValue();
-    }
+    self.processor.saveState(self.allocator, &stream) catch |err| {
+        framework.logging.debugPrint("Error saving processor state: {}\n", .{err});
+        return false;
+    };
 
-    const byte_count = @sizeOf(f64) * param_count;
-    const result = stream.*.write.?(stream, buffer.ptr, byte_count);
-
-    if (result != byte_count) {
-        return std.mem.Allocator.Error.OutOfMemory;
-    }
+    const buffer = stream.data.items;
+    const result = clap_stream.*.write.?(clap_stream, buffer.ptr, buffer.len);
+    return result == buffer.len;
 }
 
-pub fn loadState(self: *@This(), stream: *const c.clap_istream_t) !void {
-    const param_count = self.processor.params.items.len;
+const BinaryStreamIn = framework.state.BinaryStreamIn;
 
-    const buffer = try self.allocator.alloc(f64, param_count);
-    defer self.allocator.free(buffer);
+pub fn loadState(self: *@This(), clap_stream: *const c.clap_istream_t) bool {
+    const chunk_size = 256;
+    var buffer: [chunk_size]u8 = undefined;
 
-    const byte_count = @sizeOf(f64) * param_count;
+    var stream_buffer: std.ArrayList(u8) = .empty;
+    defer stream_buffer.deinit(self.allocator);
 
-    const result = stream.*.read.?(stream, buffer.ptr, byte_count);
-    if (result != byte_count) {
-        return std.mem.Allocator.Error.OutOfMemory;
+    while (true) {
+        const amount = clap_stream.*.read.?(clap_stream, @ptrCast(&buffer), chunk_size);
+        if (amount < 0) return false; // Error occurred
+        if (amount == 0) break;
+
+        stream_buffer.appendSlice(self.allocator, buffer[0..@intCast(amount)]) catch return false;
     }
 
-    for (self.processor.params.items, buffer) |*param, value| {
-        param.setValue(value);
-    }
+    var stream: BinaryStreamIn = .init(stream_buffer.items);
+    self.processor.loadState(self.allocator, &stream) catch return false;
+
+    return true;
 }

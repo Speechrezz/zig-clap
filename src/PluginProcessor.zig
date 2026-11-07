@@ -106,3 +106,15 @@ fn renderBlock(self: *@This(), audio_slice: AudioSlice, volume: f32) void {
         }
     }
 }
+
+pub fn saveState(self: *@This(), allocator: std.mem.Allocator, stream: *framework.state.BinaryStreamOut) !void {
+    for (self.params.items) |*param| {
+        try stream.appendValue(allocator, param.getValue());
+    }
+}
+
+pub fn loadState(self: *@This(), _: std.mem.Allocator, stream: *framework.state.BinaryStreamIn) !void {
+    for (self.params.items) |*param| {
+        param.setValue(stream.readValue(f64));
+    }
+}
