@@ -17,7 +17,7 @@ pub fn getNumSamples(self: @This()) usize {
     return self.num_samples;
 }
 
-pub fn createSubView(self: @This(), start_sample: usize, num_samples: usize) @This() {
+pub fn createSubSlice(self: @This(), start_sample: usize, num_samples: usize) @This() {
     return .{
         .channels = self.channels,
         .start_sample = start_sample,
@@ -70,7 +70,7 @@ pub fn addFrom(self: @This(), other: @This()) void {
     }
 }
 
-test "AudioView tests" {
+test "AudioSlice tests" {
     const AudioBuffer = @import("AudioBuffer.zig");
     const allocator = std.testing.allocator;
 
@@ -85,32 +85,32 @@ test "AudioView tests" {
     defer buffer2.deinit(allocator);
     try buffer2.resize(allocator, num_channels, block_size);
 
-    const view1 = buffer1.createSlice();
-    view1.fill(1.0);
+    const slice1 = buffer1.createSlice();
+    slice1.fill(1.0);
 
-    for (0..view1.getNumChannels()) |ch| {
-        const channel = view1.getChannel(ch);
+    for (0..slice1.getNumChannels()) |ch| {
+        const channel = slice1.getChannel(ch);
         for (channel) |sample| {
             try std.testing.expect(sample == 1.0);
         }
     }
 
-    const view2 = buffer2.createSlice();
-    view2.fill(2.0);
+    const slice2 = buffer2.createSlice();
+    slice2.fill(2.0);
 
-    view1.addFrom(view2);
+    slice1.addFrom(slice2);
 
-    for (0..view1.getNumChannels()) |ch| {
-        const channel = view1.getChannel(ch);
+    for (0..slice1.getNumChannels()) |ch| {
+        const channel = slice1.getChannel(ch);
         for (channel) |sample| {
             try std.testing.expect(sample == 3.0);
         }
     }
 
-    view1.multiplyBy(2.0);
+    slice1.multiplyBy(2.0);
 
-    for (0..view1.getNumChannels()) |ch| {
-        const channel = view1.getChannel(ch);
+    for (0..slice1.getNumChannels()) |ch| {
+        const channel = slice1.getChannel(ch);
         for (channel) |sample| {
             try std.testing.expect(sample == 6.0);
         }

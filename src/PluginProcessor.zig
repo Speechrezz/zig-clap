@@ -56,14 +56,14 @@ pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.
         self.handleNoteEvent(note_event);
 
         const num_samples = note_event.sample - prev_sample;
-        const slice = audio.createSubView(prev_sample, num_samples);
+        const slice = audio.createSubSlice(prev_sample, num_samples);
         self.renderBlock(slice, volume);
 
         prev_sample = note_event.sample;
     }
 
     const num_samples = audio.getNumSamples() - prev_sample;
-    const slice = audio.createSubView(prev_sample, num_samples);
+    const slice = audio.createSubSlice(prev_sample, num_samples);
     self.renderBlock(slice, volume);
 }
 
