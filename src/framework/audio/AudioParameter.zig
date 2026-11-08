@@ -20,7 +20,8 @@ pub const Flags = enum(u32) {
     IsEnum = 1 << 16,
 };
 
-id: u32,
+id: u32 = undefined,
+version: u32,
 flags: u32 = 0,
 name: []const u8,
 min_value: f64,
@@ -29,9 +30,9 @@ default_value: f64,
 
 value: std.atomic.Value(f64),
 
-pub fn init(id: u32, name: []const u8, min_value: f64, max_value: f64, default_value: f64) @This() {
+pub fn init(version: u32, name: []const u8, min_value: f64, max_value: f64, default_value: f64) @This() {
     return .{
-        .id = id,
+        .version = version,
         .flags = @backingInt(Flags.IsAutomatable),
         .name = name,
         .min_value = min_value,

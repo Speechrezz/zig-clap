@@ -20,6 +20,12 @@ pub fn add(self: *@This(), allocator: std.mem.Allocator, param: AudioParameter) 
     return self.params.lastPtr().?;
 }
 
+fn lessThanFn(self: *@This(), lhs: u32, rhs: u32) bool {
+    const param1 = &self.params.items[lhs];
+    const param2 = &self.params.items[rhs];
+    return param1.version < param2.version;
+}
+
 /// Call after all parameters have been added
 pub fn finalize(self: *@This(), allocator: std.mem.Allocator) !void {
     // TODO: Order based on version number
@@ -30,6 +36,8 @@ pub fn finalize(self: *@This(), allocator: std.mem.Allocator) !void {
         self.params.items[i].id = id;
         self.ordered.items[i] = id;
     }
+
+    std.sort.block(u32, self.ordered.items, self, lessThanFn);
 }
 
 pub fn getCount(self: *const @This()) u64 {
@@ -73,9 +81,25 @@ test {
     var params: @This() = .init();
     defer params.deinit(allocator);
 
-    const param = try params.add(allocator, .init(
-        0,
-        "Volume",
+    const param1 = try params.add(allocator, .init(
+        1,
+        "Param1",
+        0.0,
+        1.0,
+        0.5,
+    ));
+
+    const param2 = try params.add(allocator, .init(
+        2,
+        "Param2",
+        0.0,
+        1.0,
+        0.5,
+    ));
+
+    const param3 = try params.add(allocator, .init(
+        1,
+        "Param2",
         0.0,
         1.0,
         0.5,
@@ -83,7 +107,9 @@ test {
 
     try params.finalize(allocator);
 
-    try std.testing.expectEqual(1, params.getCount());
-    try std.testing.expectEqual(param, params.get(0));
-    try std.testing.expectEqual(null, params.getChecked(1));
+    try std.testing.expectEqual(3, params.getCount());
+    try std.testing.expectEqual(param1, params.get(0));
+    try std.testing.expectEqual(param3, params.get(1));
+    try std.testing.expectEqual(param2, params.get(2));
+    try std.testing.expectEqual(null, params.getChecked(3));
 }

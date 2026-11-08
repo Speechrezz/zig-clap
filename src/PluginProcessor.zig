@@ -25,7 +25,7 @@ pub fn init(self: *@This(), allocator: std.mem.Allocator, _: std.Io) !void {
     };
 
     self.volume_param = try self.params.add(allocator, .init(
-        0,
+        1,
         "Volume",
         0.0,
         1.0,
