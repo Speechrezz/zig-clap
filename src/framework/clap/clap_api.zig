@@ -5,6 +5,17 @@ const c = @import("c");
 
 const ClapProcessorFn = @import("clap_processor.zig").ClapProcessor;
 
+pub const ClapConfig = struct {
+    id: [:0]const u8,
+    name: [:0]const u8,
+    vendor: [:0]const u8 = "",
+    url: [:0]const u8 = "",
+    manual_url: [:0]const u8 = "",
+    support_url: [:0]const u8 = "",
+    version: [:0]const u8 = "",
+    description: [:0]const u8 = "",
+};
+
 const clap_version: c.clap_version_t = .{
     .major = c.CLAP_VERSION_MAJOR,
     .minor = c.CLAP_VERSION_MINOR,
@@ -16,7 +27,7 @@ fn cStrEql(lhs: [*:0]const u8, rhs: [*:0]const u8) bool {
     return std.mem.orderZ(u8, lhs, rhs) == .eq;
 }
 
-pub fn ClapApi(comptime PluginProcessor: type) type {
+pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type {
     const ClapProcessor = ClapProcessorFn(PluginProcessor);
 
     return struct {
@@ -84,14 +95,14 @@ pub fn ClapApi(comptime PluginProcessor: type) type {
 
         const plugin_descriptor: c.clap_plugin_descriptor_t = .{
             .clap_version = clap_version,
-            .id = "xynth.Test2",
-            .name = "Test2",
-            .vendor = "Xynth Audio",
-            .url = "xynth.audio",
-            .manual_url = "https://github.com/Speechrezz/zig-clap",
-            .support_url = "https://github.com/Speechrezz/zig-clap",
-            .version = "0.0.1",
-            .description = "The best audio plugin ever.",
+            .id = config.id.ptr,
+            .name = config.name.ptr,
+            .vendor = config.vendor.ptr,
+            .url = config.url.ptr,
+            .manual_url = config.manual_url.ptr,
+            .support_url = config.support_url.ptr,
+            .version = config.version.ptr,
+            .description = config.description.ptr,
             .features = &plugin_features,
         };
 

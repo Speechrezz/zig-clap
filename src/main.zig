@@ -26,8 +26,22 @@ pub fn main(init: std.process.Init) !void {
     });
 }
 
-const ClapApi = @import("framework/clap/clap_api.zig").ClapApi(PluginProcessor);
-export var clap_entry = ClapApi.clap_entry;
+const ClapApi = @import("framework/clap/clap_api.zig").ClapApi;
+const Plugin = ClapApi(
+    PluginProcessor,
+    .{
+        .id = "xynth.ZigClap",
+        .name = "ZigClap",
+        .vendor = "Xynth Audio",
+        .url = "https://www.xynth.audio/",
+        .manual_url = "https://github.com/Speechrezz/zig-clap",
+        .support_url = "https://github.com/Speechrezz/zig-clap",
+        .version = "0.0.1",
+        .description = "A plugin made using Zig and the CLAP SDK.",
+    },
+);
+
+export var clap_entry = Plugin.clap_entry;
 
 test {
     _ = framework;
