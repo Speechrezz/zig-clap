@@ -1,5 +1,6 @@
 pub const AudioBuffer = @import("AudioBuffer.zig");
 pub const AudioParameter = @import("AudioParameter.zig");
+pub const AudioParameterContainer = @import("AudioParameterContainer.zig");
 pub const AudioSlice = @import("AudioSlice.zig");
 
 pub const ProcessSpec = struct {
@@ -11,5 +12,6 @@ pub const ProcessSpec = struct {
 test {
     _ = AudioBuffer;
     _ = AudioParameter;
+    _ = AudioParameterContainer;
     _ = AudioSlice;
 }

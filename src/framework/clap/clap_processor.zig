@@ -65,12 +65,11 @@ pub fn ClapProcessor(comptime PluginProcessor: type) type {
         }
 
         pub fn getParamCount(self: *const @This()) u32 {
-            return @intCast(self.processor.params.items.len);
+            return @intCast(self.processor.params.getCount());
         }
 
         pub fn getParamAtIndex(self: *const @This(), index: u32) ?*AudioParameter {
-            if (index >= self.processor.params.items.len) return null;
-            return &self.processor.params.items[index];
+            return self.processor.params.getChecked(index);
         }
 
         pub fn getParamWithId(self: *const @This(), id: u32) ?*AudioParameter {
@@ -128,37 +127,38 @@ pub fn ClapProcessor(comptime PluginProcessor: type) type {
 
         fn handleParamValueEvent(self: *@This(), event: *const c.clap_event_header_t) void {
             const value_event: *const c.clap_event_param_value_t = @ptrCast(@alignCast(event));
-            const i = value_event.param_id;
+            const id = value_event.param_id;
 
-            self.processor.params.items[i].setValue(value_event.value);
+            self.processor.params.get(id).setValue(value_event.value);
         }
 
         pub fn syncMainToAudio(self: *@This(), out: [*c]const c.clap_output_events_t) void {
+            _ = self;
             _ = out;
 
-            for (0..self.processor.params.items.len) |i| {
-                _ = i;
-                // TODO: Check if parameter was changed via main thread using a dirty flag
+            // for (0..self.processor.params.items.len) |i| {
+            // _ = i;
+            // TODO: Check if parameter was changed via main thread using a dirty flag
 
-                // const event: c.clap_event_param_value_t = .{
-                //     .header = .{
-                //         .size = @sizeOf(c.clap_event_param_value_t),
-                //         .time = 0,
-                //         .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
-                //         .type = c.CLAP_EVENT_PARAM_VALUE,
-                //         .flags = 0,
-                //     },
-                //     .param_id = @intCast(i),
-                //     .cookie = null,
-                //     .note_id = -1,
-                //     .port_index = -1,
-                //     .channel = -1,
-                //     .key = -1,
-                //     .value = self.parameters[i],
-                // };
+            // const event: c.clap_event_param_value_t = .{
+            //     .header = .{
+            //         .size = @sizeOf(c.clap_event_param_value_t),
+            //         .time = 0,
+            //         .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
+            //         .type = c.CLAP_EVENT_PARAM_VALUE,
+            //         .flags = 0,
+            //     },
+            //     .param_id = @intCast(i),
+            //     .cookie = null,
+            //     .note_id = -1,
+            //     .port_index = -1,
+            //     .channel = -1,
+            //     .key = -1,
+            //     .value = self.parameters[i],
+            // };
 
-                // _ = out.*.try_push.?(out, &event.header);
-            }
+            // _ = out.*.try_push.?(out, &event.header);
+            // }
         }
 
         // pub fn processBlock(self: *@This(), start: u32, end: u32, outputL: [*]f32, outputR: [*]f32) void {

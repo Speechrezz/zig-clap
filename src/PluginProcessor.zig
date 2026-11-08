@@ -12,22 +12,27 @@ const Voice = struct {
     phase: f32,
 };
 
-params: std.ArrayList(AudioParameter) = .empty,
+params: framework.audio.AudioParameterContainer,
+volume_param: *AudioParameter = undefined,
 
 sample_rate: f32 = -1.0,
 voices: std.ArrayList(Voice) = .empty,
 voices_buffer: [max_voices]Voice = undefined,
 
 pub fn init(self: *@This(), allocator: std.mem.Allocator, _: std.Io) !void {
-    self.* = .{};
+    self.* = .{
+        .params = .init(),
+    };
 
-    try self.params.append(allocator, .init(
+    self.volume_param = try self.params.add(allocator, .init(
         0,
         "Volume",
         0.0,
         1.0,
         0.5,
     ));
+
+    try self.params.finalize(allocator);
 
     self.voices = .initBuffer(&self.voices_buffer);
 }
@@ -44,7 +49,7 @@ pub fn prepare(self: *@This(), allocator: std.mem.Allocator, spec: framework.aud
 }
 
 pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.NoteEvent) void {
-    const volume: f32 = @floatCast(self.params.items[0].getValue());
+    const volume: f32 = @floatCast(self.volume_param.getValue());
 
     var prev_sample: u32 = 0;
     for (note_events) |note_event| {
@@ -108,13 +113,9 @@ fn renderBlock(self: *@This(), audio_slice: AudioSlice, volume: f32) void {
 }
 
 pub fn saveState(self: *@This(), allocator: std.mem.Allocator, stream: *framework.state.BinaryStreamOut) !void {
-    for (self.params.items) |*param| {
-        try stream.appendValue(allocator, param.getValue());
-    }
+    try self.params.saveState(allocator, stream);
 }
 
 pub fn loadState(self: *@This(), _: std.mem.Allocator, stream: *framework.state.BinaryStreamIn) !void {
-    for (self.params.items) |*param| {
-        param.setValue(stream.readValue(f64));
-    }
+    self.params.loadState(stream);
 }
