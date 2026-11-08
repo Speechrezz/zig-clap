@@ -6,14 +6,19 @@ const c = @import("c");
 const ClapProcessorFn = @import("clap_processor.zig").ClapProcessor;
 
 pub const ClapConfig = struct {
-    id: [:0]const u8,
-    name: [:0]const u8,
-    vendor: [:0]const u8 = "",
-    url: [:0]const u8 = "",
-    manual_url: [:0]const u8 = "",
-    support_url: [:0]const u8 = "",
-    version: [:0]const u8 = "",
-    description: [:0]const u8 = "",
+    pub const Descriptor = struct {
+        id: [:0]const u8,
+        name: [:0]const u8,
+        vendor: [:0]const u8 = "",
+        url: [:0]const u8 = "",
+        manual_url: [:0]const u8 = "",
+        support_url: [:0]const u8 = "",
+        version: [:0]const u8 = "",
+        description: [:0]const u8 = "",
+        features: [:null]const ?[*:0]const u8 = &.{},
+    };
+
+    descriptor: Descriptor,
 };
 
 const clap_version: c.clap_version_t = .{
@@ -95,22 +100,15 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
 
         const plugin_descriptor: c.clap_plugin_descriptor_t = .{
             .clap_version = clap_version,
-            .id = config.id.ptr,
-            .name = config.name.ptr,
-            .vendor = config.vendor.ptr,
-            .url = config.url.ptr,
-            .manual_url = config.manual_url.ptr,
-            .support_url = config.support_url.ptr,
-            .version = config.version.ptr,
-            .description = config.description.ptr,
-            .features = &plugin_features,
-        };
-
-        const plugin_features = [_][*c]const u8{
-            c.CLAP_PLUGIN_FEATURE_INSTRUMENT,
-            c.CLAP_PLUGIN_FEATURE_SYNTHESIZER,
-            c.CLAP_PLUGIN_FEATURE_STEREO,
-            null,
+            .id = config.descriptor.id.ptr,
+            .name = config.descriptor.name.ptr,
+            .vendor = config.descriptor.vendor.ptr,
+            .url = config.descriptor.url.ptr,
+            .manual_url = config.descriptor.manual_url.ptr,
+            .support_url = config.descriptor.support_url.ptr,
+            .version = config.descriptor.version.ptr,
+            .description = config.descriptor.description.ptr,
+            .features = config.descriptor.features.ptr,
         };
 
         // ---Plugin Class---

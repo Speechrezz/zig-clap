@@ -30,14 +30,21 @@ const ClapApi = @import("framework/clap/clap_api.zig").ClapApi;
 const Plugin = ClapApi(
     PluginProcessor,
     .{
-        .id = "xynth.ZigClap",
-        .name = "ZigClap",
-        .vendor = "Xynth Audio",
-        .url = "https://www.xynth.audio/",
-        .manual_url = "https://github.com/Speechrezz/zig-clap",
-        .support_url = "https://github.com/Speechrezz/zig-clap",
-        .version = "0.0.1",
-        .description = "A plugin made using Zig and the CLAP SDK.",
+        .descriptor = .{
+            .id = "xynth.ZigClap",
+            .name = "ZigClap",
+            .vendor = "Xynth Audio",
+            .url = "https://www.xynth.audio/",
+            .manual_url = "https://github.com/Speechrezz/zig-clap",
+            .support_url = "https://github.com/Speechrezz/zig-clap",
+            .version = "0.0.1",
+            .description = "A plugin made using Zig and the CLAP SDK.",
+            .features = &.{
+                c.CLAP_PLUGIN_FEATURE_INSTRUMENT,
+                c.CLAP_PLUGIN_FEATURE_SYNTHESIZER,
+                c.CLAP_PLUGIN_FEATURE_STEREO,
+            },
+        },
     },
 );
 
