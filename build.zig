@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) void {
     // ---Standalone---
 
     const exe = b.addExecutable(.{
-        .name = "test2",
+        .name = "ZigClap",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) void {
     // ---CLAP Plugin---
 
     const plugin = b.addLibrary(.{
-        .name = "test2",
+        .name = "ZigClap",
         .linkage = .dynamic,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
@@ -58,7 +58,7 @@ pub fn build(b: *std.Build) void {
 
     const install_plugin = b.addInstallArtifact(plugin, .{
         .dest_dir = .{ .override = .bin },
-        .dest_sub_path = "test2.clap",
+        .dest_sub_path = "ZigClap.clap",
     });
 
     const clap_step = b.step("clap", "Build the CLAP plugin");
