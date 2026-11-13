@@ -64,14 +64,14 @@ pub fn getChecked(self: *const @This(), id: u32) ?*AudioParameter {
 pub fn saveState(self: *const @This(), allocator: std.mem.Allocator, stream: *state.BinaryStreamOut) !void {
     for (self.ordered.items) |index| {
         const param = &self.params.items[index];
-        try stream.appendValue(allocator, param.getValue());
+        try stream.appendValue(allocator, param.getNormalizedValue());
     }
 }
 
 pub fn loadState(self: *@This(), stream: *state.BinaryStreamIn) void {
     for (self.ordered.items) |index| {
         const param = &self.params.items[index];
-        param.setValue(stream.readValue(f64));
+        param.setNormalizedValue(stream.readValue(f64));
     }
 }
 
