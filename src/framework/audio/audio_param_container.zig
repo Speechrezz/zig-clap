@@ -99,19 +99,19 @@ pub fn AudioParamContainer(comptime Schema: type) type {
 }
 
 test {
+    const normalizable = @import("../math/normalizable.zig");
+
     const Params = AudioParamContainer(struct {
         volume: AudioParam.Float(
             2,
             "Volume",
-            0.0,
-            100.0,
+            normalizable.Linear(f64, 0.0, 100.0),
             50.0,
         ),
         frequency: AudioParam.Float(
             1,
             "Frequency",
-            20.0,
-            20000.0,
+            normalizable.Log10(f64, 20.0, 20_000.0),
             1000.0,
         ),
     });

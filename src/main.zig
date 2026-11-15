@@ -54,3 +54,49 @@ test {
     _ = framework;
     _ = PluginProcessor;
 }
+
+test "CLAP API" {
+    try std.testing.expect(clap_entry.init.?(""));
+    defer clap_entry.deinit.?();
+
+    const factory_maybe = clap_entry.get_factory.?(&c.CLAP_PLUGIN_FACTORY_ID);
+    try std.testing.expect(factory_maybe != null);
+    const factory: *const c.clap_plugin_factory_t = @ptrCast(@alignCast(factory_maybe.?));
+
+    const clap_host: c.clap_host_t = .{
+        .clap_version = .{
+            .major = c.CLAP_VERSION_MAJOR,
+            .minor = c.CLAP_VERSION_MINOR,
+            .revision = c.CLAP_VERSION_REVISION,
+        },
+        .host_data = null,
+        .name = "Test host",
+        .vendor = "Test vendor",
+        .url = null,
+        .version = null,
+        .get_extension = null,
+        .request_restart = null,
+        .request_process = null,
+        .request_callback = null,
+    };
+
+    try std.testing.expectEqual(1, factory.get_plugin_count.?(factory));
+    const descriptor = &factory.get_plugin_descriptor.?(factory, 0).*;
+
+    const plugin = &factory.create_plugin.?(factory, &clap_host, descriptor.id).*;
+    try std.testing.expect(plugin.init.?(plugin));
+    defer plugin.destroy.?(plugin);
+
+    try std.testing.expect(plugin.activate.?(plugin, 44100.0, 1, 256));
+
+    const params_maybe = plugin.get_extension.?(plugin, &c.CLAP_EXT_PARAMS);
+    const params: *const c.clap_plugin_params_t = @ptrCast(@alignCast(params_maybe.?));
+
+    const count = params.count.?(plugin);
+
+    for (0..count) |i| {
+        var info: c.clap_param_info_t = undefined;
+        _ = params.get_info.?(plugin, @intCast(i), &info);
+        std.debug.print("info: {}, {s}, {}, {}, {}\n", .{ info.id, info.name, info.min_value, info.max_value, info.default_value });
+    }
+}

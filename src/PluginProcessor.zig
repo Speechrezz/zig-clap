@@ -3,13 +3,20 @@ const framework = @import("framework/framework.zig");
 const AudioSlice = framework.audio.AudioSlice;
 
 const AudioParam = framework.audio.AudioParam;
+const normalizable = framework.math.normalizable;
 const Params = framework.audio.AudioParamContainer(struct {
     volume: AudioParam.Float(
         1,
         "Volume",
-        0.0,
-        1.0,
+        normalizable.Linear(f64, 0.0, 1.0),
         0.5,
+    ),
+    // TEST PARAM
+    frequency: AudioParam.Float(
+        1,
+        "Frequency",
+        normalizable.Log10(f64, 20.0, 20_000.0),
+        1000.0,
     ),
 });
 

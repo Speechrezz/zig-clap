@@ -1,5 +1,4 @@
 const std = @import("std");
-const interp = @import("../math/math.zig").interpolation;
 
 const AudioParam = @This();
 
@@ -85,8 +84,7 @@ pub fn valueFromText(self: *const @This(), text: []const u8) ?f64 {
 pub fn Float(
     comptime param_version: comptime_int,
     comptime name: []const u8,
-    comptime min_value: comptime_float,
-    comptime max_value: comptime_float,
+    comptime Range: type,
     comptime default_value: comptime_float,
 ) type {
     return struct {
@@ -98,10 +96,10 @@ pub fn Float(
             self.* = .{
                 .param = .{
                     .name = name,
-                    .min_value = min_value,
-                    .max_value = max_value,
+                    .min_value = Range.lower,
+                    .max_value = Range.upper,
                     .default_value = default_value,
-                    .normalized_value = .init(default_value), // TODO: THIS NEEDS TO BE NORMALIZED
+                    .normalized_value = .init(Range.toNormalized(default_value)),
                     .ptr = self,
                     .vtable = &.{
                         .toNormalized = toNormalizedErased,
@@ -115,16 +113,12 @@ pub fn Float(
 
         // --Custom methods--
 
-        pub fn toNormalized(value: f64) f64 {
-            return interp.invLerp(min_value, max_value, value);
-        }
-
         pub fn toNormalizedErased(ptr: *const anyopaque, value: f64) f64 {
             // TODO: This is a temporary implementation
             const self: *const @This() = @ptrCast(@alignCast(ptr));
             _ = self;
 
-            return (value - min_value) / (max_value - min_value);
+            return Range.toNormalized(value);
         }
 
         pub fn fromNormalizedErased(ptr: *const anyopaque, value: f64) f64 {
@@ -132,7 +126,7 @@ pub fn Float(
             const self: *const @This() = @ptrCast(@alignCast(ptr));
             _ = self;
 
-            return std.math.lerp(min_value, max_value, value);
+            return Range.fromNormalized(value);
         }
 
         pub fn textFromValueErased(ptr: *const anyopaque, value: f64, buffer: []u8) ?[]u8 {
@@ -159,19 +153,18 @@ pub fn Float(
         }
 
         pub fn getValue(self: *const @This()) f64 {
-            return fromNormalizedErased(self, self.getNormalizedValue());
+            return Range.fromNormalized(self.getNormalizedValue());
         }
     };
 }
 
 test "Float" {
-    // const allocator = std.testing.allocator;
+    const normalizable = @import("../math/normalizable.zig");
 
     var param1: Float(
         1,
         "Volume",
-        0.0,
-        100.0,
+        normalizable.Linear(f64, 0.0, 100.0),
         50.0,
     ) = undefined;
 
