@@ -59,11 +59,12 @@ pub fn AudioParamContainer(comptime Schema: type) type {
             }
 
             // Populate the erased array in sorted order.
-            inline for (sorted_indices, 0..) |index, i| {
-                const name = field_names[index];
+            inline for (sorted_indices, 0..) |src, dst| {
+                const name = field_names[src];
                 const param = &@field(self.values, name);
 
-                self.erased[i] = &param.param;
+                self.erased[dst] = &param.param;
+                param.param.id = @intCast(dst);
             }
         }
 
