@@ -1,7 +1,17 @@
 const std = @import("std");
 const framework = @import("framework/framework.zig");
-const AudioParameter = framework.audio.AudioParameter;
 const AudioSlice = framework.audio.AudioSlice;
+
+const AudioParam = framework.audio.AudioParam;
+const Params = framework.audio.AudioParamContainer(struct {
+    volume: AudioParam.Float(
+        1,
+        "Volume",
+        0.0,
+        1.0,
+        0.5,
+    ),
+});
 
 const max_voices = 8;
 const Voice = struct {
@@ -12,28 +22,18 @@ const Voice = struct {
     phase: f32,
 };
 
-params: framework.audio.AudioParameterContainer,
-volume_param: *AudioParameter = undefined,
+params: Params = undefined,
 
 sample_rate: f32 = -1.0,
 voices: std.ArrayList(Voice) = .empty,
 voices_buffer: [max_voices]Voice = undefined,
 
 pub fn init(self: *@This(), allocator: std.mem.Allocator, _: std.Io) !void {
-    self.* = .{
-        .params = .init(),
-    };
+    _ = allocator;
 
-    self.volume_param = try self.params.add(allocator, .init(
-        1,
-        "Volume",
-        0.0,
-        1.0,
-        0.5,
-    ));
+    self.* = .{};
 
-    try self.params.finalize(allocator);
-
+    self.params.init();
     self.voices = .initBuffer(&self.voices_buffer);
 }
 
@@ -49,7 +49,7 @@ pub fn prepare(self: *@This(), allocator: std.mem.Allocator, spec: framework.aud
 }
 
 pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.NoteEvent) void {
-    const volume: f32 = @floatCast(self.volume_param.getValue());
+    const volume: f32 = @floatCast(self.params.values.volume.param.getValue()); // TODO: Move `getValue` to volume param directly
 
     var prev_sample: u32 = 0;
     for (note_events) |note_event| {

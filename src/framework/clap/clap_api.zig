@@ -338,23 +338,29 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
         ) callconv(.c) bool {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
             const param = plugin.getParamWithId(id) orelse return false;
-            _ = param; // TODO
 
-            _ = std.mem.printSentinel(display[0..size], "{:.2}", .{value}, 0) catch return false;
+            const text = param.textFromValue(plugin.allocator, value) catch return false;
+            defer plugin.allocator.free(text);
+            _ = std.mem.printSentinel(display[0..size], "{s}", .{text}, 0) catch return false;
+
             return true;
         }
 
         fn extParamTextToValue(
-            _: [*c]const c.clap_plugin_t,
+            clap_plugin: [*c]const c.clap_plugin_t,
             id: c.clap_id,
             display: [*c]const u8,
             value: [*c]f64,
         ) callconv(.c) bool {
-            // TODO
-            _ = id;
-            _ = display;
-            _ = value;
-            return false;
+            std.debug.assert(display != null);
+
+            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+            const param = plugin.getParamWithId(id) orelse return false;
+
+            const text = std.mem.span(display);
+            value.* = param.valueFromText(text) catch return false;
+
+            return true;
         }
 
         fn extParamFlush(

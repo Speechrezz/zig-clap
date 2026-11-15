@@ -7,7 +7,7 @@ const logging = @import("../logging/logging.zig");
 const midi = @import("../midi/midi.zig");
 const state = @import("../state/state.zig");
 
-const AudioParameter = audio.AudioParameter;
+const AudioParam = audio.AudioParam;
 const BinaryStreamOut = state.BinaryStreamOut;
 const BinaryStreamIn = state.BinaryStreamIn;
 
@@ -68,11 +68,11 @@ pub fn ClapProcessor(comptime PluginProcessor: type) type {
             return @intCast(self.processor.params.getCount());
         }
 
-        pub fn getParamAtIndex(self: *const @This(), index: u32) ?*AudioParameter {
+        pub fn getParamAtIndex(self: *const @This(), index: u32) ?*AudioParam {
             return self.processor.params.getChecked(index);
         }
 
-        pub fn getParamWithId(self: *const @This(), id: u32) ?*AudioParameter {
+        pub fn getParamWithId(self: *const @This(), id: u32) ?*AudioParam {
             return self.getParamAtIndex(id);
         }
 

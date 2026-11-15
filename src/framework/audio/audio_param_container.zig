@@ -1,0 +1,110 @@
+const std = @import("std");
+const AudioParam = @import("AudioParam.zig");
+const state = @import("../state/state.zig");
+
+fn sortIndicesByVersion(
+    comptime Schema: type,
+) [@typeInfo(Schema).@"struct".field_names.len]usize {
+    const info = @typeInfo(Schema).@"struct";
+    const count = info.field_names.len;
+
+    @setEvalBranchQuota(100_000);
+
+    const Versions = [count]usize;
+
+    var indices: [count]usize = undefined;
+    var versions: Versions = undefined;
+
+    inline for (info.field_types, 0..) |T, i| {
+        indices[i] = i;
+        versions[i] = T.version;
+    }
+
+    const Context = struct {
+        fn lessThan(ver: Versions, lhs: usize, rhs: usize) bool {
+            return ver[lhs] < ver[rhs];
+        }
+    };
+
+    std.sort.block(
+        usize,
+        &indices,
+        versions,
+        Context.lessThan,
+    );
+
+    return indices;
+}
+
+pub fn AudioParamContainer(comptime Schema: type) type {
+    const info = @typeInfo(Schema).@"struct";
+    const field_names = info.field_names;
+    const count = field_names.len;
+
+    const sorted_indices = comptime sortIndicesByVersion(Schema);
+
+    return struct {
+        pub const ParamCount = count;
+
+        // Concrete parameter instances
+        values: Schema,
+
+        // Type-erased parameters
+        erased: [count]*AudioParam,
+
+        pub fn init(self: *@This()) void {
+            inline for (field_names) |name| {
+                const param = &@field(self.values, name);
+                param.init();
+            }
+
+            // Populate the erased array in sorted order.
+            inline for (sorted_indices, 0..) |index, i| {
+                const name = field_names[index];
+                const param = &@field(self.values, name);
+
+                self.erased[i] = &param.param;
+            }
+        }
+
+        pub fn size(self: *const @This()) usize {
+            return self.erased.len;
+        }
+
+        pub fn getChecked(self: *@This(), index: usize) ?*AudioParam {
+            if (index >= self.size()) return null;
+
+            return self.erased[index];
+        }
+    };
+}
+
+test {
+    const Params = AudioParamContainer(struct {
+        volume: AudioParam.Float(
+            2,
+            "Volume",
+            0.0,
+            100.0,
+            50.0,
+        ),
+        frequency: AudioParam.Float(
+            1,
+            "Frequency",
+            20.0,
+            20000.0,
+            1000.0,
+        ),
+    });
+
+    var params: Params = undefined;
+    params.init();
+
+    _ = params.values.volume;
+    _ = params.values.frequency;
+
+    try std.testing.expect(null, params.getChecked(2));
+
+    const volume = params.erased[1];
+    try std.testing.expectEqualStrings("Volume", volume.name);
+}
