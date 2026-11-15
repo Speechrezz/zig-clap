@@ -1,4 +1,5 @@
 const std = @import("std");
+const interp = @import("../math/math.zig").interpolation;
 
 const AudioParam = @This();
 
@@ -113,6 +114,10 @@ pub fn Float(
         }
 
         // --Custom methods--
+
+        pub fn toNormalized(value: f64) f64 {
+            return interp.invLerp(min_value, max_value, value);
+        }
 
         pub fn toNormalizedErased(ptr: *const anyopaque, value: f64) f64 {
             // TODO: This is a temporary implementation
