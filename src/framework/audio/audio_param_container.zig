@@ -44,7 +44,7 @@ pub fn AudioParamContainer(comptime Schema: type) type {
     const sorted_indices = comptime sortIndicesByVersion(Schema);
 
     return struct {
-        pub const ParamCount = count;
+        pub const param_count = count;
 
         // Concrete parameter instances
         values: Schema,
@@ -86,13 +86,19 @@ pub fn AudioParamContainer(comptime Schema: type) type {
         }
 
         pub fn saveState(self: *const @This(), allocator: std.mem.Allocator, stream: *state.BinaryStreamOut) !void {
+            const save_count: u32 = param_count;
+            try stream.appendValue(allocator, save_count);
+
             for (self.erased) |param| {
                 try stream.appendValue(allocator, param.getNormalizedValue());
             }
         }
 
         pub fn loadState(self: *@This(), stream: *state.BinaryStreamIn) void {
-            for (self.erased) |param| {
+            const load_count = stream.readValue(u32);
+
+            for (0..load_count) |i| {
+                const param = self.erased[i];
                 param.setNormalizedValue(stream.readValue(f64));
             }
         }
