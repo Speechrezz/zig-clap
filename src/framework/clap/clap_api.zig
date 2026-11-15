@@ -336,14 +336,18 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
             display: [*c]u8,
             size: u32,
         ) callconv(.c) bool {
+            std.debug.assert(size > 0);
+
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
             const param = plugin.getParamWithId(id) orelse return false;
 
-            const text = param.textFromValue(plugin.allocator, value) catch return false;
-            defer plugin.allocator.free(text);
-            _ = std.mem.printSentinel(display[0..size], "{s}", .{text}, 0) catch return false;
-
-            return true;
+            if (param.textFromValue(value, display[0 .. size - 1])) |text| {
+                display[text.len] = 0; // Add null terminator
+                return true;
+            } else {
+                display[size - 1] = 0; // Add null terminator
+                return false;
+            }
         }
 
         fn extParamTextToValue(
@@ -358,7 +362,7 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
             const param = plugin.getParamWithId(id) orelse return false;
 
             const text = std.mem.span(display);
-            value.* = param.valueFromText(text) catch return false;
+            value.* = param.valueFromText(text) orelse return false;
 
             return true;
         }

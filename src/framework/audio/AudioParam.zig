@@ -112,6 +112,8 @@ pub fn Float(
             };
         }
 
+        // --Custom methods--
+
         pub fn toNormalizedErased(ptr: *const anyopaque, value: f64) f64 {
             // TODO: This is a temporary implementation
             const self: *const @This() = @ptrCast(@alignCast(ptr));
@@ -142,6 +144,17 @@ pub fn Float(
             _ = self;
 
             return std.fmt.parseFloat(f64, text) catch return null;
+        }
+
+        // --Shared methods--
+        // TODO: Move this into a shared place
+
+        pub fn getNormalizedValue(self: *const @This()) f64 {
+            return self.param.normalized_value.load(.unordered);
+        }
+
+        pub fn getValue(self: *const @This()) f64 {
+            return fromNormalizedErased(self, self.getNormalizedValue());
         }
     };
 }

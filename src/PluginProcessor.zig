@@ -38,7 +38,8 @@ pub fn init(self: *@This(), allocator: std.mem.Allocator, _: std.Io) !void {
 }
 
 pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
-    self.params.deinit(allocator);
+    _ = self;
+    _ = allocator;
 }
 
 pub fn prepare(self: *@This(), allocator: std.mem.Allocator, spec: framework.audio.ProcessSpec) !void {
@@ -49,7 +50,7 @@ pub fn prepare(self: *@This(), allocator: std.mem.Allocator, spec: framework.aud
 }
 
 pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.NoteEvent) void {
-    const volume: f32 = @floatCast(self.params.values.volume.param.getValue()); // TODO: Move `getValue` to volume param directly
+    const volume: f32 = @floatCast(self.params.values.volume.getValue());
 
     var prev_sample: u32 = 0;
     for (note_events) |note_event| {

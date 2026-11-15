@@ -67,14 +67,33 @@ pub fn AudioParamContainer(comptime Schema: type) type {
             }
         }
 
-        pub fn size(self: *const @This()) usize {
-            return self.erased.len;
+        pub fn getCount(self: *const @This()) usize {
+            _ = self;
+            return count;
         }
 
-        pub fn getChecked(self: *@This(), index: usize) ?*AudioParam {
-            if (index >= self.size()) return null;
+        pub fn getChecked(self: *const @This(), index: usize) ?*AudioParam {
+            if (index >= self.getCount()) return null;
 
             return self.erased[index];
+        }
+
+        pub fn get(self: *const @This(), index: usize) *AudioParam {
+            std.debug.assert(index < self.getCount());
+
+            return self.erased[index];
+        }
+
+        pub fn saveState(self: *const @This(), allocator: std.mem.Allocator, stream: *state.BinaryStreamOut) !void {
+            for (self.erased) |param| {
+                try stream.appendValue(allocator, param.getNormalizedValue());
+            }
+        }
+
+        pub fn loadState(self: *@This(), stream: *state.BinaryStreamIn) void {
+            for (self.erased) |param| {
+                param.setNormalizedValue(stream.readValue(f64));
+            }
         }
     };
 }
@@ -103,7 +122,7 @@ test {
     _ = params.values.volume;
     _ = params.values.frequency;
 
-    try std.testing.expect(null, params.getChecked(2));
+    try std.testing.expectEqual(null, params.getChecked(2));
 
     const volume = params.erased[1];
     try std.testing.expectEqualStrings("Volume", volume.name);
