@@ -18,6 +18,16 @@ pub fn build(b: *std.Build) void {
 
     translator.addIncludePath(b.path("libraries"));
 
+    // ---Framework---
+
+    const framework_mod = b.addModule("framework", .{
+        .root_source_file = b.path("src/framework/framework.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    framework_mod.addImport("c", translator.mod);
+
     // ---Standalone---
 
     const exe = b.addExecutable(.{
@@ -30,6 +40,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.root_module.addImport("c", translator.mod);
+    exe.root_module.addImport("framework", framework_mod);
     exe.root_module.link_libc = true;
 
     b.installArtifact(exe);
@@ -54,6 +65,7 @@ pub fn build(b: *std.Build) void {
     });
 
     plugin.root_module.addImport("c", translator.mod);
+    plugin.root_module.addImport("framework", framework_mod);
     plugin.root_module.link_libc = true;
 
     const install_plugin = b.addInstallArtifact(plugin, .{
@@ -66,12 +78,17 @@ pub fn build(b: *std.Build) void {
 
     // ---Tests---
 
+    const framework_tests = b.addTest(.{
+        .root_module = framework_mod,
+    });
     const exe_tests = b.addTest(.{
         .root_module = exe.root_module,
     });
 
+    const run_framework_tests = b.addRunArtifact(framework_tests);
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
     const test_step = b.step("test", "Run tests");
+    test_step.dependOn(&run_framework_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 }

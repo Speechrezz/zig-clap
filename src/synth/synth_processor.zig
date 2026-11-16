@@ -1,5 +1,5 @@
 const std = @import("std");
-const framework = @import("../framework/framework.zig");
+const framework = @import("framework");
 const audio = framework.audio;
 const logging = framework.logging;
 const NoteEvent = framework.midi.NoteEvent;

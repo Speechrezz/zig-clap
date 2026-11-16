@@ -2,7 +2,7 @@ const std = @import("std");
 const Io = std.Io;
 
 const c = @import("c");
-const framework = @import("framework/framework.zig");
+const framework = @import("framework");
 const PluginProcessor = @import("PluginProcessor.zig");
 
 pub fn main(init: std.process.Init) !void {
@@ -26,8 +26,7 @@ pub fn main(init: std.process.Init) !void {
     });
 }
 
-const ClapApi = @import("framework/clap/clap_api.zig").ClapApi;
-const Plugin = ClapApi(
+const Plugin = framework.ClapApi(
     PluginProcessor,
     .{
         .descriptor = .{
@@ -51,7 +50,6 @@ const Plugin = ClapApi(
 export var clap_entry = Plugin.clap_entry;
 
 test {
-    _ = framework;
     _ = PluginProcessor;
 }
 
