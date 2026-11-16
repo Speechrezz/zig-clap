@@ -1,4 +1,5 @@
 const std = @import("std");
+const formatting = @import("../fmt/value_formatting.zig");
 
 const AudioParam = @This();
 
@@ -28,6 +29,7 @@ name: []const u8,
 min_value: f64,
 max_value: f64,
 default_value: f64,
+default_value_norm: f64,
 
 normalized_value: std.atomic.Value(f64),
 
@@ -81,25 +83,31 @@ pub fn valueFromText(self: *const @This(), text: []const u8) ?f64 {
 
 // ---Param types---
 
-pub fn Float(
-    comptime param_version: comptime_int,
-    comptime name: []const u8,
-    comptime Range: type,
-    comptime default_value: comptime_float,
-) type {
+pub fn Float(comptime spec: struct {
+    version: comptime_int,
+    name: []const u8,
+    Range: type,
+    default_value: comptime_float,
+    Formatter: type = formatting.Basic(f64, "{:.2}", 1.0),
+}) type {
+    const default_value_norm = spec.Range.toNormalized(spec.default_value);
+
     return struct {
-        pub const version: comptime_int = param_version;
+        pub const version: comptime_int = spec.version;
+        pub const Range = spec.Range;
+        pub const Formatter = spec.Formatter;
 
         param: AudioParam,
 
         pub fn init(self: *@This()) void {
             self.* = .{
                 .param = .{
-                    .name = name,
+                    .name = spec.name,
                     .min_value = Range.lower,
                     .max_value = Range.upper,
-                    .default_value = default_value,
-                    .normalized_value = .init(Range.toNormalized(default_value)),
+                    .default_value = spec.default_value,
+                    .default_value_norm = default_value_norm,
+                    .normalized_value = .init(default_value_norm),
                     .ptr = self,
                     .vtable = &.{
                         .toNormalized = toNormalizedErased,
@@ -118,7 +126,7 @@ pub fn Float(
             const self: *const @This() = @ptrCast(@alignCast(ptr));
             _ = self;
 
-            return Range.toNormalized(value);
+            return spec.Range.toNormalized(value);
         }
 
         pub fn fromNormalizedErased(ptr: *const anyopaque, value: f64) f64 {
@@ -126,7 +134,7 @@ pub fn Float(
             const self: *const @This() = @ptrCast(@alignCast(ptr));
             _ = self;
 
-            return Range.fromNormalized(value);
+            return spec.Range.fromNormalized(value);
         }
 
         pub fn textFromValueErased(ptr: *const anyopaque, value: f64, buffer: []u8) ?[]u8 {
@@ -134,7 +142,7 @@ pub fn Float(
             const self: *const @This() = @ptrCast(@alignCast(ptr));
             _ = self;
 
-            return std.mem.print(buffer, "{:.2}", .{value}) catch return null;
+            return Formatter.textFromValue(value, buffer) catch return null;
         }
 
         pub fn valueFromTextErased(ptr: *const anyopaque, text: []const u8) ?f64 {
@@ -142,7 +150,7 @@ pub fn Float(
             const self: *const @This() = @ptrCast(@alignCast(ptr));
             _ = self;
 
-            return std.fmt.parseFloat(f64, text) catch return null;
+            return Formatter.valueFromText(text) catch return null;
         }
 
         // --Shared methods--
@@ -161,12 +169,12 @@ pub fn Float(
 test "Float" {
     const normalizable = @import("../math/normalizable.zig");
 
-    var param1: Float(
-        1,
-        "Volume",
-        normalizable.Linear(f64, 0.0, 100.0),
-        50.0,
-    ) = undefined;
+    var param1: Float(.{
+        .version = 1,
+        .name = "Volume",
+        .Range = normalizable.Linear(f64, 0.0, 100.0),
+        .default_value = 50.0,
+    }) = undefined;
 
     param1.init();
 }

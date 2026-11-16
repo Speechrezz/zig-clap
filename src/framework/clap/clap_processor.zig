@@ -129,7 +129,7 @@ pub fn ClapProcessor(comptime PluginProcessor: type) type {
             const value_event: *const c.clap_event_param_value_t = @ptrCast(@alignCast(event));
             const id = value_event.param_id;
 
-            self.processor.params.get(id).setValue(value_event.value);
+            self.processor.params.get(id).setNormalizedValue(value_event.value);
         }
 
         pub fn syncMainToAudio(self: *@This(), out: [*c]const c.clap_output_events_t) void {

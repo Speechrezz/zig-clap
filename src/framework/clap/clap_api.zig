@@ -307,9 +307,9 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
             info.* = std.mem.zeroes(c.clap_param_info_t);
             info.*.id = param.id;
             info.*.flags = param.flags;
-            info.*.min_value = param.min_value;
-            info.*.max_value = param.max_value;
-            info.*.default_value = param.default_value;
+            info.*.min_value = 0.0;
+            info.*.max_value = 1.0;
+            info.*.default_value = param.default_value_norm;
             _ = std.mem.printSentinel(
                 &info.*.name,
                 "{s}",
@@ -325,14 +325,14 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
             const param = plugin.getParamAtIndex(index) orelse return false;
 
-            value.* = param.getValue();
+            value.* = param.getNormalizedValue();
             return true;
         }
 
         fn extParamValueToText(
             clap_plugin: [*c]const c.clap_plugin_t,
             id: c.clap_id,
-            value: f64,
+            normalized_value: f64,
             display: [*c]u8,
             size: u32,
         ) callconv(.c) bool {
@@ -340,6 +340,7 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
 
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
             const param = plugin.getParamWithId(id) orelse return false;
+            const value = param.fromNormalized(normalized_value);
 
             if (param.textFromValue(value, display[0 .. size - 1])) |text| {
                 display[text.len] = 0; // Add null terminator
@@ -363,6 +364,7 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
 
             const text = std.mem.span(display);
             value.* = param.valueFromText(text) orelse return false;
+            value.* = param.toNormalized(value.*);
 
             return true;
         }

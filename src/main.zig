@@ -96,7 +96,14 @@ test "CLAP API" {
 
     for (0..count) |i| {
         var info: c.clap_param_info_t = undefined;
-        _ = params.get_info.?(plugin, @intCast(i), &info);
-        std.debug.print("info: {}, {s}, {}, {}, {}\n", .{ info.id, info.name, info.min_value, info.max_value, info.default_value });
+        try std.testing.expect(params.get_info.?(plugin, @intCast(i), &info));
+
+        // std.debug.print("info: {}, {s}, {}, {}, {}\n", .{
+        //     info.id,
+        //     info.name,
+        //     info.min_value,
+        //     info.max_value,
+        //     info.default_value,
+        // });
     }
 }

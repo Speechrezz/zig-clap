@@ -90,7 +90,7 @@ pub fn AudioParamContainer(comptime Schema: type) type {
             try stream.appendValue(allocator, save_count);
 
             for (self.erased) |param| {
-                try stream.appendValue(allocator, param.getNormalizedValue());
+                try stream.appendValue(allocator, param.getValue());
             }
         }
 
@@ -99,7 +99,7 @@ pub fn AudioParamContainer(comptime Schema: type) type {
 
             for (0..load_count) |i| {
                 const param = self.erased[i];
-                param.setNormalizedValue(stream.readValue(f64));
+                param.setValue(stream.readValue(f64));
             }
         }
     };
@@ -109,18 +109,18 @@ test {
     const normalizable = @import("../math/normalizable.zig");
 
     const Params = AudioParamContainer(struct {
-        volume: AudioParam.Float(
-            2,
-            "Volume",
-            normalizable.Linear(f64, 0.0, 100.0),
-            50.0,
-        ),
-        frequency: AudioParam.Float(
-            1,
-            "Frequency",
-            normalizable.Log10(f64, 20.0, 20_000.0),
-            1000.0,
-        ),
+        volume: AudioParam.Float(.{
+            .version = 2,
+            .name = "Volume",
+            .Range = normalizable.Linear(f64, 0.0, 100.0),
+            .default_value = 50.0,
+        }),
+        frequency: AudioParam.Float(.{
+            .version = 1,
+            .name = "Frequency",
+            .Range = normalizable.Log10(f64, 20.0, 20_000.0),
+            .default_value = 1000.0,
+        }),
     });
 
     var params: Params = undefined;
