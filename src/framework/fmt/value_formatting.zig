@@ -49,6 +49,31 @@ pub fn Hertz(comptime T: type) type {
     };
 }
 
+pub fn Seconds(comptime T: type) type {
+    return struct {
+        pub fn textFromValue(value: T, buffer: []u8) ![]u8 {
+            if (value >= 1.0) {
+                return std.mem.print(buffer, "{:.2} sec", .{value});
+            } else {
+                return std.mem.print(buffer, "{:.1} ms", .{value * 1000.0});
+            }
+        }
+
+        pub fn valueFromText(text: []const u8) !T {
+            const trimmed = trimFloatString(text);
+            const value = try std.fmt.parseFloat(T, trimmed);
+
+            const found_ms = std.mem.find(u8, text, "ms") != null;
+
+            if (found_ms) {
+                return value / 1000.0;
+            } else {
+                return value;
+            }
+        }
+    };
+}
+
 pub fn Milliseconds(comptime T: type) type {
     return struct {
         pub fn textFromValue(value: T, buffer: []u8) ![]u8 {
@@ -94,6 +119,19 @@ test Hertz {
 
     try std.testing.expectApproxEqRel(123.4, try Formatter.valueFromText("123.4 Hz"), tolerance);
     try std.testing.expectApproxEqRel(12_340.0, try Formatter.valueFromText("12.34 k"), tolerance);
+}
+
+test Seconds {
+    var buffer: [32]u8 = @splat(0);
+
+    const Formatter = Seconds(f64);
+
+    try std.testing.expectEqualStrings("123.4 ms", try Formatter.textFromValue(0.1234, &buffer));
+    try std.testing.expectEqualStrings("12.34 sec", try Formatter.textFromValue(12.34, &buffer));
+
+    try std.testing.expectApproxEqRel(0.1234, try Formatter.valueFromText("0.1234"), tolerance);
+    try std.testing.expectApproxEqRel(0.1234, try Formatter.valueFromText("123.4 ms"), tolerance);
+    try std.testing.expectApproxEqRel(12.34, try Formatter.valueFromText("12.34 s"), tolerance);
 }
 
 test Milliseconds {

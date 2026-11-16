@@ -17,6 +17,35 @@ const Params = framework.audio.AudioParamContainer(struct {
         .default_value = 0.5,
         .Formatter = formatting.Percent(f64),
     }),
+
+    attack: AudioParam.Float(.{
+        .version = 1,
+        .name = "Attack",
+        .Range = normalizable.SkewedCenter(f64, 0.0, 1.0, 0.1),
+        .default_value = 0.002,
+        .Formatter = formatting.Seconds(f64),
+    }),
+    decay: AudioParam.Float(.{
+        .version = 1,
+        .name = "Decay",
+        .Range = normalizable.SkewedCenter(f64, 0.0, 1.0, 0.1),
+        .default_value = 0.1,
+        .Formatter = formatting.Seconds(f64),
+    }),
+    sustain: AudioParam.Float(.{
+        .version = 1,
+        .name = "Sustain",
+        .Range = normalizable.Linear(f64, 0.0, 1.0),
+        .default_value = 0.5,
+        .Formatter = formatting.Percent(f64),
+    }),
+    release: AudioParam.Float(.{
+        .version = 1,
+        .name = "Release",
+        .Range = normalizable.SkewedCenter(f64, 0.0, 1.0, 0.1),
+        .default_value = 0.01,
+        .Formatter = formatting.Seconds(f64),
+    }),
     // TEST PARAM
     frequency: AudioParam.Float(.{
         .version = 1,
@@ -49,6 +78,17 @@ pub fn prepare(self: *@This(), allocator: std.mem.Allocator, spec: framework.aud
 
 pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.NoteEvent) void {
     const volume: f32 = @floatCast(self.params.values.volume.getValue());
+
+    const adsr_params: framework.dsp.AdsrProcessor.Parameters = .{
+        .attack_time = @floatCast(self.params.values.attack.getValue()),
+        .decay_time = @floatCast(self.params.values.decay.getValue()),
+        .sustain_gain = @floatCast(self.params.values.sustain.getValue()),
+        .release_time = @floatCast(self.params.values.release.getValue()),
+    };
+
+    for (&self.synth.synth_voices) |*voice| {
+        voice.adsr.updateParameters(adsr_params);
+    }
 
     self.synth.process(audio, note_events);
     audio.multiplyBy(volume);
