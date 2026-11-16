@@ -6,6 +6,9 @@ const AudioParam = framework.audio.AudioParam;
 const normalizable = framework.math.normalizable;
 const formatting = framework.fmt.value;
 
+const SynthProcessor = @import("synth/synth_processor.zig").SynthProcessor;
+const SineVoice = @import("synth/SineVoice.zig");
+
 const Params = framework.audio.AudioParamContainer(struct {
     volume: AudioParam.Float(.{
         .version = 1,
@@ -24,20 +27,8 @@ const Params = framework.audio.AudioParamContainer(struct {
     }),
 });
 
-const max_voices = 8;
-const Voice = struct {
-    held: bool,
-    note_id: i32,
-    channel: i16,
-    key: framework.midi.NoteNumber,
-    phase: f32,
-};
-
 params: Params = undefined,
-
-sample_rate: f32 = -1.0,
-voices: std.ArrayList(Voice) = .empty,
-voices_buffer: [max_voices]Voice = undefined,
+synth: SynthProcessor(SineVoice, .{}) = undefined,
 
 pub fn init(self: *@This(), allocator: std.mem.Allocator, _: std.Io) !void {
     _ = allocator;
@@ -45,83 +36,22 @@ pub fn init(self: *@This(), allocator: std.mem.Allocator, _: std.Io) !void {
     self.* = .{};
 
     self.params.init();
-    self.voices = .initBuffer(&self.voices_buffer);
+    self.synth.init(.{});
 }
 
 pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
-    _ = self;
-    _ = allocator;
+    self.synth.deinit(allocator);
 }
 
 pub fn prepare(self: *@This(), allocator: std.mem.Allocator, spec: framework.audio.ProcessSpec) !void {
-    _ = allocator;
-    // TODO
-
-    self.sample_rate = @floatCast(spec.sample_rate);
+    try self.synth.prepare(allocator, spec);
 }
 
 pub fn process(self: *@This(), audio: AudioSlice, note_events: []framework.midi.NoteEvent) void {
     const volume: f32 = @floatCast(self.params.values.volume.getValue());
 
-    var prev_sample: u32 = 0;
-    for (note_events) |note_event| {
-        self.handleNoteEvent(note_event);
-
-        const num_samples = note_event.sample - prev_sample;
-        const slice = audio.createSubSlice(prev_sample, num_samples);
-        self.renderBlock(slice, volume);
-
-        prev_sample = note_event.sample;
-    }
-
-    const num_samples = audio.getNumSamples() - prev_sample;
-    const slice = audio.createSubSlice(prev_sample, num_samples);
-    self.renderBlock(slice, volume);
-}
-
-fn handleNoteEvent(self: *@This(), note_event: framework.midi.NoteEvent) void {
-    var i = self.voices.items.len;
-    while (i > 0) {
-        i -= 1;
-        const voice = &self.voices.items[i];
-
-        const key_match = note_event.key == -1 or note_event.key == voice.key;
-        const id_match = true; //note_event.note_id == -1 or note_event.note_id == voice.note_id;
-        const channel_match = true; //note_event.channel == -1 or note_event.channel == voice.channel;
-        if (key_match and id_match and channel_match) {
-            _ = self.voices.orderedRemove(i);
-        }
-    }
-
-    if (note_event.kind == .NoteOn and self.voices.items.len < self.voices.capacity) {
-        self.voices.appendAssumeCapacity(.{
-            .held = true,
-            .note_id = 0, // note_event.note_id,
-            .channel = 0, // note_event.channel,
-            .key = note_event.key,
-            .phase = 0.0,
-        });
-    }
-}
-
-fn renderBlock(self: *@This(), audio_slice: AudioSlice, volume: f32) void {
-    for (0..audio_slice.num_samples) |i| {
-        var sample: f32 = 0.0;
-
-        for (self.voices.items) |*voice| {
-            if (voice.held == false) continue;
-
-            sample += @sin(voice.phase * 2.0 * std.math.pi) * 0.2 * volume;
-
-            const key_float: f32 = @floatFromInt(voice.key);
-            voice.phase += 440.0 * std.math.exp2((key_float - 57.0) / 12.0) / self.sample_rate;
-            voice.phase -= @floor(voice.phase);
-        }
-
-        for (0..audio_slice.getNumChannels()) |ch| {
-            audio_slice.getChannel(ch)[i] = sample;
-        }
-    }
+    self.synth.process(audio, note_events);
+    audio.multiplyBy(volume);
 }
 
 pub fn saveState(self: *@This(), allocator: std.mem.Allocator, stream: *framework.state.BinaryStreamOut) !void {
@@ -130,4 +60,8 @@ pub fn saveState(self: *@This(), allocator: std.mem.Allocator, stream: *framewor
 
 pub fn loadState(self: *@This(), _: std.mem.Allocator, stream: *framework.state.BinaryStreamIn) !void {
     self.params.loadState(stream);
+}
+
+test {
+    _ = SynthProcessor;
 }

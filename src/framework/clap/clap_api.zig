@@ -148,7 +148,7 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
         ) callconv(.c) bool {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
 
-            plugin.prepare(sample_rate, min_frames_count, max_frames_count) catch false;
+            plugin.prepare(sample_rate, min_frames_count, max_frames_count) catch return false;
             return true;
         }
 

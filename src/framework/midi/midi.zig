@@ -11,6 +11,6 @@ pub const NoteEvent = struct {
     velocity: f32,
 };
 
-pub fn frequencyFromKey(key: anytype) @TypeOf(key) {
-    440.0 * std.math.exp2((key - 57.0) / 12.0);
+pub fn frequencyFromKey(key: anytype, freq_of_a: anytype) @TypeOf(key, freq_of_a) {
+    return freq_of_a * std.math.exp2((key - 57.0) / 12.0);
 }
