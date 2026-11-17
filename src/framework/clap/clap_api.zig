@@ -2,11 +2,13 @@ const std = @import("std");
 const builtin = @import("builtin");
 const dbg = @import("debug_clap.zig");
 const c = @import("c");
+const c_str = @import("c_str.zig");
 
 const ExtNotePorts = @import("ext_note_ports.zig").ExtNotePorts;
 const ExtAudioPorts = @import("ext_audio_ports.zig").ExtAudioPorts;
 const ExtParams = @import("ext_params.zig").ExtParams;
 const ExtState = @import("ext_state.zig").ExtState;
+const ExtGui = @import("ext_gui.zig").ExtGui;
 
 const ClapProcessorFn = @import("clap_processor.zig").ClapProcessor;
 
@@ -32,11 +34,6 @@ const clap_version: c.clap_version_t = .{
     .revision = c.CLAP_VERSION_REVISION,
 };
 
-// Returns `true` if the two C-Strings are equal
-fn cStrEql(lhs: [*:0]const u8, rhs: [*:0]const u8) bool {
-    return std.mem.orderZ(u8, lhs, rhs) == .eq;
-}
-
 pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type {
     const ClapProcessor = ClapProcessorFn(PluginProcessor);
 
@@ -59,7 +56,7 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
         fn entryDeinit() callconv(.c) void {}
 
         fn entryGetFactory(factory_id: [*c]const u8) callconv(.c) ?*const anyopaque {
-            const does_id_match = cStrEql(factory_id.?, &c.CLAP_PLUGIN_FACTORY_ID);
+            const does_id_match = c_str.isEql(factory_id.?, &c.CLAP_PLUGIN_FACTORY_ID);
             if (!does_id_match) return null;
 
             return &plugin_factory;
@@ -93,7 +90,7 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
             plugin_id: [*c]const u8,
         ) callconv(.c) [*c]const c.clap_plugin_t {
             const is_version_compatible = c.clap_version_is_compatible(host.*.clap_version);
-            const is_id_matching = cStrEql(plugin_id.?, plugin_descriptor.id.?);
+            const is_id_matching = c_str.isEql(plugin_id.?, plugin_descriptor.id.?);
             if (!is_version_compatible or !is_id_matching) {
                 return null;
             }
@@ -211,10 +208,11 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
             _: [*c]const c.clap_plugin_t,
             id: [*c]const u8,
         ) callconv(.c) ?*const anyopaque {
-            if (cStrEql(id.?, &c.CLAP_EXT_NOTE_PORTS)) return &ext_note_ports;
-            if (cStrEql(id.?, &c.CLAP_EXT_AUDIO_PORTS)) return &ext_audio_ports;
-            if (cStrEql(id.?, &c.CLAP_EXT_PARAMS)) return &ext_params;
-            if (cStrEql(id.?, &c.CLAP_EXT_STATE)) return &ext_plugin_state;
+            if (c_str.isEql(id.?, &c.CLAP_EXT_NOTE_PORTS)) return &ext_note_ports;
+            if (c_str.isEql(id.?, &c.CLAP_EXT_AUDIO_PORTS)) return &ext_audio_ports;
+            if (c_str.isEql(id.?, &c.CLAP_EXT_PARAMS)) return &ext_params;
+            if (c_str.isEql(id.?, &c.CLAP_EXT_STATE)) return &ext_plugin_state;
+            if (c_str.isEql(id.?, &c.CLAP_EXT_GUI)) return &ext_gui;
 
             return null;
         }
@@ -229,6 +227,7 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
         const ext_audio_ports = ExtAudioPorts(ClapProcessor).extension;
         const ext_params = ExtParams(ClapProcessor).extension;
         const ext_plugin_state = ExtState(ClapProcessor).extension;
+        const ext_gui = ExtGui(ClapProcessor).extension;
 
         // ---Tests---
 

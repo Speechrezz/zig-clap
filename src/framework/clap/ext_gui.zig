@@ -1,0 +1,131 @@
+const std = @import("std");
+const c = @import("c");
+const c_str = @import("c_str.zig");
+
+// TEMP
+
+const GUI_API = c.CLAP_WINDOW_API_WIN32;
+fn GuiCreate(_: anytype) void {}
+fn GuiDestroy(_: anytype) void {}
+fn GuiSetParent(_: anytype, _: anytype) void {}
+fn GuiSetVisible(_: anytype, _: bool) void {}
+
+pub fn ExtGui(comptime ClapProcessor: type) type {
+    const WIDTH = 300;
+    const HEIGHT = 200;
+
+    return struct {
+        pub const extension: c.clap_plugin_gui_t = .{
+            .is_api_supported = isApiSupported,
+            .get_preferred_api = getPrefferedApi,
+            .create = create,
+            .destroy = destroy,
+            .set_scale = setScale,
+            .get_size = getSize,
+            .can_resize = canResize,
+            .get_resize_hints = getResizeHints,
+            .adjust_size = adjustSize,
+            .set_size = setSize,
+            .set_parent = setParent,
+            .set_transient = setTransient,
+            .suggest_title = suggestTitle,
+            .show = show,
+            .hide = hide,
+        };
+
+        fn isApiSupported(
+            _: [*c]const c.clap_plugin_t,
+            api: [*c]const u8,
+            is_floating: bool,
+        ) callconv(.c) bool {
+            return c_str.isEql(api, &GUI_API) and !is_floating;
+        }
+
+        fn getPrefferedApi(
+            _: [*c]const c.clap_plugin_t,
+            api: [*c][*c]const u8,
+            is_floating: [*c]bool,
+        ) callconv(.c) bool {
+            api.* = &GUI_API;
+            is_floating.* = false;
+            return true;
+        }
+
+        fn create(
+            clap_plugin: [*c]const c.clap_plugin_t,
+            api: [*c]const u8,
+            is_floating: bool,
+        ) callconv(.c) bool {
+            if (!isApiSupported(clap_plugin, api, is_floating)) return false;
+
+            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+            GuiCreate(plugin); // TODO
+            return true;
+        }
+
+        fn destroy(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) void {
+            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+            GuiDestroy(plugin); // TODO
+        }
+
+        fn setScale(_: [*c]const c.clap_plugin_t, scale: f64) callconv(.c) bool {
+            _ = scale;
+            return false;
+        }
+
+        fn getSize(_: [*c]const c.clap_plugin_t, width: [*c]u32, height: [*c]u32) callconv(.c) bool {
+            width.* = WIDTH;
+            height.* = HEIGHT;
+            return true;
+        }
+
+        fn canResize(_: [*c]const c.clap_plugin_t) callconv(.c) bool {
+            return false;
+        }
+
+        fn getResizeHints(_: [*c]const c.clap_plugin_t, hints: [*c]c.clap_gui_resize_hints_t) callconv(.c) bool {
+            _ = hints;
+            return false;
+        }
+
+        fn adjustSize(clap_plugin: [*c]const c.clap_plugin_t, width: [*c]u32, height: [*c]u32) callconv(.c) bool {
+            return getSize(clap_plugin, width, height);
+        }
+
+        fn setSize(_: [*c]const c.clap_plugin_t, width: u32, height: u32) callconv(.c) bool {
+            _ = width;
+            _ = height;
+            return true;
+        }
+
+        fn setParent(clap_plugin: [*c]const c.clap_plugin_t, window: [*c]const c.clap_window_t) callconv(.c) bool {
+            std.debug.assert(c_str.isEql(window.*.api, &GUI_API));
+
+            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+            GuiSetParent(plugin, window); // TODO
+
+            return true;
+        }
+
+        fn setTransient(_: [*c]const c.clap_plugin_t, window: [*c]const c.clap_window_t) callconv(.c) bool {
+            _ = window;
+            return false;
+        }
+
+        fn suggestTitle(_: [*c]const c.clap_plugin_t, title: [*c]const u8) callconv(.c) void {
+            _ = title;
+        }
+
+        fn show(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) bool {
+            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+            GuiSetVisible(plugin, true); // TODO
+            return true;
+        }
+
+        fn hide(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) bool {
+            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+            GuiSetVisible(plugin, false); // TODO
+            return true;
+        }
+    };
+}
