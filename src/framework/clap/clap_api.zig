@@ -3,6 +3,11 @@ const builtin = @import("builtin");
 const dbg = @import("debug_clap.zig");
 const c = @import("c");
 
+const ExtNotePorts = @import("ext_note_ports.zig").ExtNotePorts;
+const ExtAudioPorts = @import("ext_audio_ports.zig").ExtAudioPorts;
+const ExtParams = @import("ext_params.zig").ExtParams;
+const ExtState = @import("ext_state.zig").ExtState;
+
 const ClapProcessorFn = @import("clap_processor.zig").ClapProcessor;
 
 pub const ClapConfig = struct {
@@ -206,10 +211,10 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
             _: [*c]const c.clap_plugin_t,
             id: [*c]const u8,
         ) callconv(.c) ?*const anyopaque {
-            if (cStrEql(id.?, &c.CLAP_EXT_NOTE_PORTS)) return &extension_note_ports;
-            if (cStrEql(id.?, &c.CLAP_EXT_AUDIO_PORTS)) return &extension_audio_ports;
-            if (cStrEql(id.?, &c.CLAP_EXT_PARAMS)) return &extension_params;
-            if (cStrEql(id.?, &c.CLAP_EXT_STATE)) return &extension_plugin_state;
+            if (cStrEql(id.?, &c.CLAP_EXT_NOTE_PORTS)) return &ext_note_ports;
+            if (cStrEql(id.?, &c.CLAP_EXT_AUDIO_PORTS)) return &ext_audio_ports;
+            if (cStrEql(id.?, &c.CLAP_EXT_PARAMS)) return &ext_params;
+            if (cStrEql(id.?, &c.CLAP_EXT_STATE)) return &ext_plugin_state;
 
             return null;
         }
@@ -220,191 +225,12 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
 
         // ---Extensions---
 
-        const extension_note_ports: c.clap_plugin_note_ports_t = .{
-            .count = notePortsCount,
-            .get = getNotePorts,
-        };
+        const ext_note_ports = ExtNotePorts(ClapProcessor).extension;
+        const ext_audio_ports = ExtAudioPorts(ClapProcessor).extension;
+        const ext_params = ExtParams(ClapProcessor).extension;
+        const ext_plugin_state = ExtState(ClapProcessor).extension;
 
-        fn notePortsCount(_: [*c]const c.clap_plugin_t, is_input: bool) callconv(.c) u32 {
-            return if (is_input) 1 else 0;
-        }
-
-        fn getNotePorts(
-            _: [*c]const c.clap_plugin_t,
-            index: u32,
-            is_input: bool,
-            info: [*c]c.clap_note_port_info_t,
-        ) callconv(.c) bool {
-            if (!is_input or index != 0) return false;
-
-            info.*.id = 0;
-            info.*.supported_dialects = c.CLAP_NOTE_DIALECT_CLAP;
-            info.*.preferred_dialect = c.CLAP_NOTE_DIALECT_CLAP;
-            _ = std.mem.printSentinel(
-                &info.*.name,
-                "Note Port",
-                .{},
-                0,
-            ) catch return false;
-
-            return true;
-        }
-
-        const extension_audio_ports: c.clap_plugin_audio_ports_t = .{
-            .count = audioPortsCount,
-            .get = getAudioPorts,
-        };
-
-        fn audioPortsCount(_: [*c]const c.clap_plugin_t, is_input: bool) callconv(.c) u32 {
-            return if (is_input) 0 else 1;
-        }
-
-        fn getAudioPorts(
-            _: [*c]const c.clap_plugin_t,
-            index: u32,
-            is_input: bool,
-            info: [*c]c.clap_audio_port_info_t,
-        ) callconv(.c) bool {
-            if (is_input or index != 0) return false;
-
-            info.*.id = 0;
-            info.*.channel_count = 2;
-            info.*.flags = c.CLAP_AUDIO_PORT_IS_MAIN;
-            info.*.port_type = &c.CLAP_PORT_STEREO;
-            info.*.in_place_pair = c.CLAP_INVALID_ID;
-            _ = std.mem.printSentinel(
-                &info.*.name,
-                "Audio Output",
-                .{},
-                0,
-            ) catch return false;
-
-            return true;
-        }
-
-        const extension_params: c.clap_plugin_params_t = .{
-            .count = extParamCount,
-            .get_info = extParamGetInfo,
-            .get_value = extParamGetValue,
-            .value_to_text = extParamValueToText,
-            .text_to_value = extParamTextToValue,
-            .flush = extParamFlush,
-        };
-
-        fn extParamCount(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) u32 {
-            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            return plugin.getParamCount();
-        }
-
-        fn extParamGetInfo(
-            clap_plugin: [*c]const c.clap_plugin_t,
-            index: u32,
-            info: [*c]c.clap_param_info_t,
-        ) callconv(.c) bool {
-            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            const param = plugin.getParamAtIndex(index) orelse return false;
-
-            info.* = std.mem.zeroes(c.clap_param_info_t);
-            info.*.id = param.id;
-            info.*.flags = param.flags;
-            info.*.min_value = 0.0;
-            info.*.max_value = 1.0;
-            info.*.default_value = param.default_value_norm;
-            _ = std.mem.printSentinel(
-                &info.*.name,
-                "{s}",
-                .{param.name},
-                0,
-            ) catch return false;
-
-            return true;
-        }
-
-        /// This will be called on the main thread, so we need to communicate this info to the audio thread
-        fn extParamGetValue(clap_plugin: [*c]const c.clap_plugin_t, index: u32, value: [*c]f64) callconv(.c) bool {
-            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            const param = plugin.getParamAtIndex(index) orelse return false;
-
-            value.* = param.getNormalizedValue();
-            return true;
-        }
-
-        fn extParamValueToText(
-            clap_plugin: [*c]const c.clap_plugin_t,
-            id: c.clap_id,
-            normalized_value: f64,
-            display: [*c]u8,
-            size: u32,
-        ) callconv(.c) bool {
-            std.debug.assert(size > 0);
-
-            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            const param = plugin.getParamWithId(id) orelse return false;
-            const value = param.fromNormalized(normalized_value);
-
-            if (param.textFromValue(value, display[0 .. size - 1])) |text| {
-                display[text.len] = 0; // Add null terminator
-                return true;
-            } else {
-                display[size - 1] = 0; // Add null terminator
-                return false;
-            }
-        }
-
-        fn extParamTextToValue(
-            clap_plugin: [*c]const c.clap_plugin_t,
-            id: c.clap_id,
-            display: [*c]const u8,
-            value: [*c]f64,
-        ) callconv(.c) bool {
-            std.debug.assert(display != null);
-
-            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            const param = plugin.getParamWithId(id) orelse return false;
-
-            const text = std.mem.span(display);
-            value.* = param.valueFromText(text) orelse return false;
-            value.* = param.toNormalized(value.*);
-
-            return true;
-        }
-
-        fn extParamFlush(
-            clap_plugin: [*c]const c.clap_plugin_t,
-            in: [*c]const c.clap_input_events_t,
-            out: [*c]const c.clap_output_events_t,
-        ) callconv(.c) void {
-            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            const event_count = in.*.size.?(in);
-
-            plugin.syncMainToAudio(out);
-            for (0..event_count) |i| {
-                plugin.processEvent(in.*.get.?(in, @intCast(i))) catch @panic("Out of memory");
-            }
-        }
-
-        const extension_plugin_state: c.clap_plugin_state_t = .{
-            .save = extStateSave,
-            .load = extStateLoad,
-        };
-
-        fn extStateSave(
-            clap_plugin: [*c]const c.clap_plugin_t,
-            stream: [*c]const c.clap_ostream_t,
-        ) callconv(.c) bool {
-            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-
-            return plugin.saveState(@ptrCast(stream));
-        }
-
-        fn extStateLoad(
-            clap_plugin: [*c]const c.clap_plugin_t,
-            stream: [*c]const c.clap_istream_t,
-        ) callconv(.c) bool {
-            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-
-            return plugin.loadState(@ptrCast(stream));
-        }
+        // ---Tests---
 
         test {
             const allocator = std.testing.allocator;
