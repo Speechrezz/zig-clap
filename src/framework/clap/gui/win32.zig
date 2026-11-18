@@ -11,11 +11,17 @@ pub fn Gui(comptime config: Config) type {
 
         window: ?windows.HWND = null,
         bits: []u32 = undefined,
+        width: u32,
+        height: u32,
 
         pub fn create(allocator: std.mem.Allocator, width: comptime_int, height: comptime_int) !*@This() {
             const self = try allocator.create(@This());
-            self.* = .{};
+            self.* = .{
+                .width = width,
+                .height = height,
+            };
 
+            // TODO: Put a mutex around this?
             if (global_open_gui_count == 0) {
                 // Register the window class.
                 var window_class = std.mem.zeroes(c.WNDCLASSA);
@@ -79,21 +85,56 @@ pub fn Gui(comptime config: Config) type {
         }
 
         fn windowsCallback(window: c.HWND, message: c.UINT, wParam: c.WPARAM, lParam: c.LPARAM) callconv(.winapi) c.LRESULT {
-            _ = window;
-            _ = message;
-            _ = wParam;
-            _ = lParam;
+            const ptr: usize = @intCast(c.GetWindowLongPtrA(window, 0));
+            const self_maybe: ?*@This() = @ptrFromInt(ptr);
+            if (self_maybe == null) {
+                return c.DefWindowProcA(window, message, wParam, lParam);
+            }
+
+            const self = self_maybe.?;
+
+            switch (message) {
+                c.WM_PAINT => {
+                    var paint: c.PAINTSTRUCT = undefined;
+                    const dc = c.BeginPaint(window, &paint);
+                    var info = std.mem.zeroes(c.BITMAPINFO);
+
+                    info.bmiHeader = .{
+                        .biSize = @sizeOf(c.BITMAPINFOHEADER),
+                        .biWidth = @intCast(self.width),
+                        .biHeight = -@as(c_long, @intCast(self.height)),
+                        .biPlanes = 1,
+                        .biBitCount = 32,
+                        .biCompression = c.BI_RGB,
+                        .biSizeImage = 0,
+                        .biXPelsPerMeter = 0,
+                        .biYPelsPerMeter = 0,
+                        .biClrUsed = 0,
+                        .biClrImportant = 0,
+                    };
+
+                    _ = c.StretchDIBits(
+                        dc,
+                        0,
+                        0,
+                        @intCast(self.width),
+                        @intCast(self.height),
+                        0,
+                        0,
+                        @intCast(self.width),
+                        @intCast(self.height),
+                        self.bits.ptr,
+                        &info,
+                        c.DIB_RGB_COLORS,
+                        c.SRCCOPY,
+                    );
+
+                    _ = c.EndPaint(window, &paint);
+                },
+                else => return c.DefWindowProcA(window, message, wParam, lParam),
+            }
 
             return 0;
-            // const self_maybe: ?*@This() = @ptrCast(@alignCast(c.GetWindowLongPtr(window, 0)));
-            // if (self_maybe == null) {
-            //     return c.DefWindowProc(window, message, wParam, lParam);
-            // }
-
-            // switch (message) {
-            //     // TODO
-            //     else => return c.DefWindowProc(window, message, wParam, lParam),
-            // }
         }
     };
 }

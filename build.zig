@@ -26,6 +26,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    if (target.result.os.tag == .windows) {
+        framework_mod.linkSystemLibrary("user32", .{});
+        framework_mod.linkSystemLibrary("gdi32", .{});
+    }
+
     framework_mod.addImport("c", translator.mod);
 
     // ---Standalone---
