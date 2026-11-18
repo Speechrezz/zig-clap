@@ -10,23 +10,7 @@ const ExtParams = @import("ext_params.zig").ExtParams;
 const ExtState = @import("ext_state.zig").ExtState;
 const ExtGui = @import("ext_gui.zig").ExtGui;
 
-const ClapProcessorFn = @import("clap_processor.zig").ClapProcessor;
-
-pub const ClapConfig = struct {
-    pub const Descriptor = struct {
-        id: [:0]const u8,
-        name: [:0]const u8,
-        vendor: [:0]const u8 = "",
-        url: [:0]const u8 = "",
-        manual_url: [:0]const u8 = "",
-        support_url: [:0]const u8 = "",
-        version: [:0]const u8 = "",
-        description: [:0]const u8 = "",
-        features: [:null]const ?[*:0]const u8 = &.{},
-    };
-
-    descriptor: Descriptor,
-};
+pub const Config = @import("Config.zig");
 
 const clap_version: c.clap_version_t = .{
     .major = c.CLAP_VERSION_MAJOR,
@@ -34,8 +18,8 @@ const clap_version: c.clap_version_t = .{
     .revision = c.CLAP_VERSION_REVISION,
 };
 
-pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type {
-    const ClapProcessor = ClapProcessorFn(PluginProcessor);
+pub fn ClapApi(comptime config: Config) type {
+    const ClapProcessor = @import("clap_processor.zig").ClapProcessor(config);
 
     return struct {
 
@@ -227,7 +211,7 @@ pub fn ClapApi(comptime PluginProcessor: type, comptime config: ClapConfig) type
         const ext_audio_ports = ExtAudioPorts(ClapProcessor).extension;
         const ext_params = ExtParams(ClapProcessor).extension;
         const ext_plugin_state = ExtState(ClapProcessor).extension;
-        const ext_gui = ExtGui(ClapProcessor).extension;
+        const ext_gui = ExtGui(config).extension;
 
         // ---Tests---
 

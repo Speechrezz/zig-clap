@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
     const translate_c = b.dependency("translate_c", .{});
 
     const translator: Translator = .init(translate_c, .{
-        .c_source_file = b.path("src/framework/clap/c.h"),
+        .c_source_file = b.path("src/framework/core/c.h"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,

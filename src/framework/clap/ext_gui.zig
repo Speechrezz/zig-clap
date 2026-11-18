@@ -1,16 +1,15 @@
 const std = @import("std");
 const c = @import("c");
 const c_str = @import("c_str.zig");
+const Config = @import("Config.zig");
 
 // TEMP
-
-const GUI_API = c.CLAP_WINDOW_API_WIN32;
-fn GuiCreate(_: anytype) void {}
 fn GuiDestroy(_: anytype) void {}
-fn GuiSetParent(_: anytype, _: anytype) void {}
-fn GuiSetVisible(_: anytype, _: bool) void {}
 
-pub fn ExtGui(comptime ClapProcessor: type) type {
+pub fn ExtGui(comptime config: Config) type {
+    const ClapProcessor = @import("clap_processor.zig").ClapProcessor(config);
+    const Gui = @import("gui/gui.zig").Gui(config);
+
     const WIDTH = 300;
     const HEIGHT = 200;
 
@@ -38,7 +37,7 @@ pub fn ExtGui(comptime ClapProcessor: type) type {
             api: [*c]const u8,
             is_floating: bool,
         ) callconv(.c) bool {
-            return c_str.isEql(api, &GUI_API) and !is_floating;
+            return c_str.isEql(api, &Gui.API) and !is_floating;
         }
 
         fn getPrefferedApi(
@@ -46,7 +45,7 @@ pub fn ExtGui(comptime ClapProcessor: type) type {
             api: [*c][*c]const u8,
             is_floating: [*c]bool,
         ) callconv(.c) bool {
-            api.* = &GUI_API;
+            api.* = &Gui.API;
             is_floating.* = false;
             return true;
         }
@@ -59,12 +58,13 @@ pub fn ExtGui(comptime ClapProcessor: type) type {
             if (!isApiSupported(clap_plugin, api, is_floating)) return false;
 
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            GuiCreate(plugin); // TODO
+            plugin.gui = Gui.create(plugin.allocator, WIDTH, HEIGHT) catch return false;
             return true;
         }
 
         fn destroy(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) void {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+            plugin.gui.?.destroy(plugin.allocator);
             GuiDestroy(plugin); // TODO
         }
 
@@ -99,10 +99,10 @@ pub fn ExtGui(comptime ClapProcessor: type) type {
         }
 
         fn setParent(clap_plugin: [*c]const c.clap_plugin_t, window: [*c]const c.clap_window_t) callconv(.c) bool {
-            std.debug.assert(c_str.isEql(window.*.api, &GUI_API));
+            std.debug.assert(c_str.isEql(window.*.api, &Gui.API));
 
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            GuiSetParent(plugin, window); // TODO
+            plugin.gui.?.setParent(@ptrCast(window.?));
 
             return true;
         }
@@ -118,13 +118,13 @@ pub fn ExtGui(comptime ClapProcessor: type) type {
 
         fn show(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) bool {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            GuiSetVisible(plugin, true); // TODO
+            plugin.gui.?.setVisible(true);
             return true;
         }
 
         fn hide(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) bool {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            GuiSetVisible(plugin, false); // TODO
+            plugin.gui.?.setVisible(false);
             return true;
         }
     };

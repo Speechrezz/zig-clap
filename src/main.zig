@@ -27,8 +27,8 @@ pub fn main(init: std.process.Init) !void {
 }
 
 const Plugin = framework.ClapApi(
-    PluginProcessor,
     .{
+        .PluginProcessor = PluginProcessor,
         .descriptor = .{
             .id = "xynth.ZigClap",
             .name = "ZigClap",

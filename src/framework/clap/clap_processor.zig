@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const c = @import("c");
+const Config = @import("Config.zig");
 
 const audio = @import("../audio/audio.zig");
 const logging = @import("../logging/logging.zig");
@@ -16,14 +17,17 @@ const use_safe_allocator = switch (builtin.mode) {
     else => false,
 };
 
-pub fn ClapProcessor(comptime PluginProcessor: type) type {
+pub fn ClapProcessor(comptime config: Config) type {
+    const Gui = @import("gui/gui.zig").Gui(config);
+
     return struct {
         safe_allocator: if (use_safe_allocator) std.heap.SafeAllocator else void,
         allocator: std.mem.Allocator,
         io: std.Io,
         io_impl: std.Io.Threaded,
 
-        processor: PluginProcessor,
+        processor: config.PluginProcessor,
+        gui: ?*Gui,
 
         clap_plugin: c.clap_plugin_t,
         host: *const c.clap_host_t,
@@ -44,6 +48,8 @@ pub fn ClapProcessor(comptime PluginProcessor: type) type {
 
             self.io_impl = .init_single_threaded;
             self.io = self.io_impl.io();
+
+            self.gui = null;
 
             self.clap_plugin = clap_plugin;
             self.clap_plugin.plugin_data = self;

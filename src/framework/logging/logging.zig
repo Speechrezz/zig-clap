@@ -16,6 +16,6 @@ pub fn debugPrint(comptime fmt: []const u8, args: anytype) void {
         const message = std.fmt.bufPrintSentinel(&buffer, fmt, args, 0) catch return;
         windows.OutputDebugStringA(message.ptr);
     } else {
-        std.debug.print(fmt ++ "\n", args);
+        std.debug.print(fmt, args);
     }
 }
