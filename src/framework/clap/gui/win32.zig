@@ -84,6 +84,13 @@ pub fn Gui(comptime config: Config) type {
             );
         }
 
+        fn repaint(self: *@This(), internal: bool) void {
+            if (internal) {
+                // TODO
+            }
+            _ = c.RedrawWindow(@ptrCast(self.window), null, null, c.RDW_INVALIDATE);
+        }
+
         fn windowsCallback(window: c.HWND, message: c.UINT, wParam: c.WPARAM, lParam: c.LPARAM) callconv(.winapi) c.LRESULT {
             const ptr: usize = @intCast(c.GetWindowLongPtrA(window, 0));
             const self_maybe: ?*@This() = @ptrFromInt(ptr);
@@ -130,6 +137,18 @@ pub fn Gui(comptime config: Config) type {
                     );
 
                     _ = c.EndPaint(window, &paint);
+                },
+                c.WM_MOUSEMOVE => {
+                    // TODO
+                    self.repaint(true);
+                },
+                c.WM_LBUTTONDOWN => {
+                    // TODO
+                    self.repaint(true);
+                },
+                c.WM_LBUTTONUP => {
+                    // TODO
+                    self.repaint(true);
                 },
                 else => return c.DefWindowProcA(window, message, wParam, lParam),
             }
