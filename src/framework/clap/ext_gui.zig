@@ -52,7 +52,7 @@ pub fn ExtGui(comptime config: Config) type {
             if (!isApiSupported(clap_plugin, api, is_floating)) return false;
 
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            plugin.gui = Gui.create(plugin.allocator, plugin.io, &plugin.processor) catch return false;
+            plugin.gui = Gui.create(plugin.allocator, plugin.io, plugin.host, &plugin.processor) catch return false;
             return true;
         }
 

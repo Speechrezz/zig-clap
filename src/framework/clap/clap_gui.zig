@@ -7,7 +7,10 @@ pub fn ClapGui(comptime config: Config) type {
     return struct {
         allocator: std.mem.Allocator,
         io: std.Io,
+        host: *const c.clap_host_t,
         processor: *config.PluginProcessor,
+
+        host_params: ?*const c.clap_host_params_t = null,
 
         width: u32 = 300,
         height: u32 = 200,
@@ -27,11 +30,13 @@ pub fn ClapGui(comptime config: Config) type {
         const slider_right = slider_x + slider_width;
         const slider_bottom = slider_y + slider_height;
 
-        pub fn init(self: *@This(), allocator: std.mem.Allocator, io: std.Io, processor: *config.PluginProcessor) void {
+        pub fn init(self: *@This(), allocator: std.mem.Allocator, io: std.Io, host: *const c.clap_host_t, processor: *config.PluginProcessor) void {
             self.* = .{
                 .allocator = allocator,
                 .io = io,
+                .host = host,
                 .processor = processor,
+                .host_params = @ptrCast(@alignCast(host.get_extension.?(host, &c.CLAP_EXT_PARAMS))),
             };
         }
 
@@ -55,6 +60,14 @@ pub fn ClapGui(comptime config: Config) type {
             return .{ self.width, self.height };
         }
 
+        fn requestHostFlush(self: *@This()) void {
+            if (self.host_params) |host_params| {
+                if (host_params.request_flush) |request_flush| {
+                    request_flush(self.host);
+                }
+            }
+        }
+
         pub fn handleMouseMove(self: *@This(), x: i32, y: i32) void {
             _ = y;
             if (self.mouse_dragging) {
@@ -66,7 +79,7 @@ pub fn ClapGui(comptime config: Config) type {
                 volume_parm.setNormalizedValue(new_value);
                 volume_parm.param.markDirtyFromMain();
 
-                // TODO: Notify host to flush params
+                self.requestHostFlush();
             }
         }
 
@@ -82,7 +95,7 @@ pub fn ClapGui(comptime config: Config) type {
 
                 volume_parm.param.startGesture();
 
-                // TODO: Notify host to flush params
+                self.requestHostFlush();
             }
         }
 
@@ -94,7 +107,7 @@ pub fn ClapGui(comptime config: Config) type {
 
                 volume_parm.param.endGesture();
 
-                // TODO: Notify host to flush params
+                self.requestHostFlush();
             }
         }
 

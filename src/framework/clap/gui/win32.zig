@@ -30,11 +30,11 @@ pub fn Gui(comptime config: Config) type {
         const timer_id = 1;
         const timer_interval_ms = 16;
 
-        pub fn create(allocator: std.mem.Allocator, io: std.Io, processor: *config.PluginProcessor) !*@This() {
+        pub fn create(allocator: std.mem.Allocator, io: std.Io, host: *const c.clap_host_t, processor: *config.PluginProcessor) !*@This() {
             const self = try allocator.create(@This());
             self.* = .{};
 
-            self.gui.init(allocator, io, processor);
+            self.gui.init(allocator, io, host, processor);
             const width, const height = self.gui.getSize();
 
             // TODO: Put a mutex around this?
