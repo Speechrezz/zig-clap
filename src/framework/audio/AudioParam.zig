@@ -102,12 +102,11 @@ pub fn markDirtyFromAudio(self: *@This()) void {
     self.dirty_from_audio.store(true, .release);
 }
 
-pub fn isDirtyFromAudio(self: *const @This()) bool {
-    return self.dirty_from_audio.load(.acquire);
-}
+pub fn consumeDirtyFromAudio(self: *@This()) bool {
+    if (!self.dirty_from_audio.load(.acquire)) return false;
 
-pub fn clearDirtyFromAudio(self: *@This()) void {
     self.dirty_from_audio.store(false, .release);
+    return true;
 }
 
 pub fn startGesture(self: *@This()) void {

@@ -45,6 +45,14 @@ pub fn ClapGui(comptime config: Config) type {
             // TODO:
         }
 
+        pub fn haveAnyParamsChanged(self: *@This()) bool {
+            for (self.processor.params.erased) |param| {
+                if (param.consumeDirtyFromAudio()) return true;
+            }
+
+            return false;
+        }
+
         pub fn paint(self: *@This(), bits: []u32) void {
             // Background
             self.paintRectangle(bits, 0, 0, self.width, self.height, 0xC0C0C0, 0xC0C0C0);

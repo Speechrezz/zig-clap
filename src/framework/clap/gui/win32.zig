@@ -180,8 +180,9 @@ pub fn Gui(comptime config: Config) type {
                 },
                 c.WM_TIMER => {
                     if (w_param == timer_id) {
-                        // self.gui.onTimer();
-                        self.repaint(true);
+                        if (self.gui.haveAnyParamsChanged()) {
+                            self.repaint(true);
+                        }
                     }
                 },
                 else => return c.DefWindowProcA(window, message, w_param, l_param),
