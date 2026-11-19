@@ -148,7 +148,6 @@ pub fn ClapProcessor(comptime config: Config) type {
                 const param = self.processor.params.get(i);
 
                 if (param.consumeGestureStarted()) {
-                    logging.debugPrint("consumeGestureStarted\n", .{});
                     const event: c.clap_event_param_gesture_t = .{
                         .header = .{
                             .size = @sizeOf(c.clap_event_param_gesture_t),
@@ -185,7 +184,6 @@ pub fn ClapProcessor(comptime config: Config) type {
                 }
 
                 if (param.consumeGestureEnded()) {
-                    logging.debugPrint("consumeGestureEnded\n", .{});
                     const event: c.clap_event_param_gesture_t = .{
                         .header = .{
                             .size = @sizeOf(c.clap_event_param_gesture_t),
