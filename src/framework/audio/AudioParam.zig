@@ -33,6 +33,12 @@ default_value_norm: f64,
 
 normalized_value: std.atomic.Value(f64),
 
+dirty_from_main: std.atomic.Value(bool) = .init(false), // Value was changed on main thread
+dirty_from_audio: std.atomic.Value(bool) = .init(false), // Value was changed on audio thread
+
+gesture_started: std.atomic.Value(bool) = .init(false),
+gesture_ended: std.atomic.Value(bool) = .init(false),
+
 ptr: *anyopaque,
 vtable: *const VTable,
 
@@ -79,6 +85,51 @@ pub fn textFromValue(self: *const @This(), value: f64, buffer: []u8) ?[]u8 {
 
 pub fn valueFromText(self: *const @This(), text: []const u8) ?f64 {
     return self.vtable.valueFromText(self.ptr, text);
+}
+
+pub fn markDirtyFromMain(self: *@This()) void {
+    self.dirty_from_main.store(true, .release);
+}
+
+pub fn consumeDirtyFromMain(self: *@This()) bool {
+    if (!self.dirty_from_main.load(.acquire)) return false;
+
+    self.dirty_from_main.store(false, .release);
+    return true;
+}
+
+pub fn markDirtyFromAudio(self: *@This()) void {
+    self.dirty_from_audio.store(true, .release);
+}
+
+pub fn isDirtyFromAudio(self: *const @This()) bool {
+    return self.dirty_from_audio.load(.acquire);
+}
+
+pub fn clearDirtyFromAudio(self: *@This()) void {
+    self.dirty_from_audio.store(false, .release);
+}
+
+pub fn startGesture(self: *@This()) void {
+    self.gesture_started.store(true, .release);
+}
+
+pub fn consumeGestureStarted(self: *@This()) bool {
+    if (!self.gesture_started.load(.acquire)) return false;
+
+    self.gesture_started.store(false, .release);
+    return true;
+}
+
+pub fn endGesture(self: *@This()) void {
+    self.gesture_ended.store(true, .release);
+}
+
+pub fn consumeGestureEnded(self: *@This()) bool {
+    if (!self.gesture_ended.load(.acquire)) return false;
+
+    self.gesture_ended.store(false, .release);
+    return true;
 }
 
 // ---Param types---
@@ -162,6 +213,14 @@ pub fn Float(comptime spec: struct {
 
         pub fn getValue(self: *const @This()) f64 {
             return Range.fromNormalized(self.getNormalizedValue());
+        }
+
+        pub fn setNormalizedValue(self: *@This(), value: f64) void {
+            self.param.normalized_value.store(value, .unordered);
+        }
+
+        pub fn setValue(self: *@This(), value: f64) void {
+            self.setNormalizedValue(Range.toNormalized(value));
         }
     };
 }

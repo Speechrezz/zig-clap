@@ -137,37 +137,69 @@ pub fn ClapProcessor(comptime config: Config) type {
         fn handleParamValueEvent(self: *@This(), event: *const c.clap_event_header_t) void {
             const value_event: *const c.clap_event_param_value_t = @ptrCast(@alignCast(event));
             const id = value_event.param_id;
+            const param = self.processor.params.get(id);
 
-            self.processor.params.get(id).setNormalizedValue(value_event.value);
+            param.setNormalizedValue(value_event.value);
+            param.markDirtyFromAudio();
         }
 
         pub fn syncMainToAudio(self: *@This(), out: [*c]const c.clap_output_events_t) void {
-            _ = self;
-            _ = out;
+            for (0..self.processor.params.getCount()) |i| {
+                const param = self.processor.params.get(i);
 
-            // for (0..self.processor.params.items.len) |i| {
-            // _ = i;
-            // TODO: Check if parameter was changed via main thread using a dirty flag
+                if (param.consumeGestureStarted()) {
+                    logging.debugPrint("consumeGestureStarted\n", .{});
+                    const event: c.clap_event_param_gesture_t = .{
+                        .header = .{
+                            .size = @sizeOf(c.clap_event_param_gesture_t),
+                            .time = 0,
+                            .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
+                            .type = c.CLAP_EVENT_PARAM_GESTURE_BEGIN,
+                            .flags = 0,
+                        },
+                        .param_id = @intCast(i),
+                    };
 
-            // const event: c.clap_event_param_value_t = .{
-            //     .header = .{
-            //         .size = @sizeOf(c.clap_event_param_value_t),
-            //         .time = 0,
-            //         .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
-            //         .type = c.CLAP_EVENT_PARAM_VALUE,
-            //         .flags = 0,
-            //     },
-            //     .param_id = @intCast(i),
-            //     .cookie = null,
-            //     .note_id = -1,
-            //     .port_index = -1,
-            //     .channel = -1,
-            //     .key = -1,
-            //     .value = self.parameters[i],
-            // };
+                    _ = out.*.try_push.?(out, &event.header);
+                }
 
-            // _ = out.*.try_push.?(out, &event.header);
-            // }
+                if (param.consumeDirtyFromMain()) {
+                    const event: c.clap_event_param_value_t = .{
+                        .header = .{
+                            .size = @sizeOf(c.clap_event_param_value_t),
+                            .time = 0,
+                            .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
+                            .type = c.CLAP_EVENT_PARAM_VALUE,
+                            .flags = 0,
+                        },
+                        .param_id = @intCast(i),
+                        .cookie = null,
+                        .note_id = -1,
+                        .port_index = -1,
+                        .channel = -1,
+                        .key = -1,
+                        .value = param.getNormalizedValue(),
+                    };
+
+                    _ = out.*.try_push.?(out, &event.header);
+                }
+
+                if (param.consumeGestureEnded()) {
+                    logging.debugPrint("consumeGestureEnded\n", .{});
+                    const event: c.clap_event_param_gesture_t = .{
+                        .header = .{
+                            .size = @sizeOf(c.clap_event_param_gesture_t),
+                            .time = 0,
+                            .space_id = c.CLAP_CORE_EVENT_SPACE_ID,
+                            .type = c.CLAP_EVENT_PARAM_GESTURE_END,
+                            .flags = 0,
+                        },
+                        .param_id = @intCast(i),
+                    };
+
+                    _ = out.*.try_push.?(out, &event.header);
+                }
+            }
         }
 
         // pub fn processBlock(self: *@This(), start: u32, end: u32, outputL: [*]f32, outputR: [*]f32) void {

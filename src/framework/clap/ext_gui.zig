@@ -131,7 +131,6 @@ pub fn ExtGui(comptime config: Config) type {
         fn onTimer(clap_plugin: [*c]const c.clap_plugin_t, timer_id: c.clap_id) callconv(.c) void {
             _ = timer_id;
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            @import("../logging/logging.zig").debugPrint("onTimer\n", .{});
 
             const have_param_values_changed = true; // TODO
             if (plugin.gui != null and have_param_values_changed) {
