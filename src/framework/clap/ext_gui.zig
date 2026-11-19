@@ -3,15 +3,9 @@ const c = @import("c");
 const c_str = @import("c_str.zig");
 const Config = @import("Config.zig");
 
-// TEMP
-fn GuiDestroy(_: anytype) void {}
-
 pub fn ExtGui(comptime config: Config) type {
     const ClapProcessor = @import("clap_processor.zig").ClapProcessor(config);
     const Gui = @import("gui/gui.zig").Gui(config);
-
-    const WIDTH = 300;
-    const HEIGHT = 200;
 
     return struct {
         pub const extension: c.clap_plugin_gui_t = .{
@@ -58,14 +52,13 @@ pub fn ExtGui(comptime config: Config) type {
             if (!isApiSupported(clap_plugin, api, is_floating)) return false;
 
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            plugin.gui = Gui.create(plugin.allocator, WIDTH, HEIGHT) catch return false;
+            plugin.gui = Gui.create(plugin.allocator, plugin.io, &plugin.processor) catch return false;
             return true;
         }
 
         fn destroy(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) void {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
             plugin.gui.?.destroy(plugin.allocator);
-            GuiDestroy(plugin); // TODO
         }
 
         fn setScale(_: [*c]const c.clap_plugin_t, scale: f64) callconv(.c) bool {
@@ -73,9 +66,10 @@ pub fn ExtGui(comptime config: Config) type {
             return false;
         }
 
-        fn getSize(_: [*c]const c.clap_plugin_t, width: [*c]u32, height: [*c]u32) callconv(.c) bool {
-            width.* = WIDTH;
-            height.* = HEIGHT;
+        fn getSize(clap_plugin: [*c]const c.clap_plugin_t, width: [*c]u32, height: [*c]u32) callconv(.c) bool {
+            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+
+            width.*, height.* = plugin.gui.?.gui.getSize();
             return true;
         }
 
@@ -126,6 +120,23 @@ pub fn ExtGui(comptime config: Config) type {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
             plugin.gui.?.setVisible(false);
             return true;
+        }
+
+        // Timer extension
+
+        pub const timer_ext: c.clap_plugin_timer_support_t = .{
+            .on_timer = onTimer,
+        };
+
+        fn onTimer(clap_plugin: [*c]const c.clap_plugin_t, timer_id: c.clap_id) callconv(.c) void {
+            _ = timer_id;
+            const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+            @import("../logging/logging.zig").debugPrint("onTimer\n", .{});
+
+            const have_param_values_changed = true; // TODO
+            if (plugin.gui != null and have_param_values_changed) {
+                plugin.gui.?.repaint(true);
+            }
         }
     };
 }

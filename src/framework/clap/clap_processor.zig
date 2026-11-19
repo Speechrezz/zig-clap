@@ -28,6 +28,8 @@ pub fn ClapProcessor(comptime config: Config) type {
 
         processor: config.PluginProcessor,
         gui: ?*Gui,
+        timer_id: c.clap_id,
+        host_timer_support: ?*const c.clap_host_timer_support_t,
 
         clap_plugin: c.clap_plugin_t,
         host: *const c.clap_host_t,
@@ -50,6 +52,7 @@ pub fn ClapProcessor(comptime config: Config) type {
             self.io = self.io_impl.io();
 
             self.gui = null;
+            self.host_timer_support = null;
 
             self.clap_plugin = clap_plugin;
             self.clap_plugin.plugin_data = self;

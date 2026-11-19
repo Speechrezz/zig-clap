@@ -81,6 +81,7 @@ pub fn ClapApi(comptime config: Config) type {
 
             const plugin = std.heap.c_allocator.create(ClapProcessor) catch return null;
             plugin.init(plugin_class, host) catch return null;
+
             return &plugin.clap_plugin;
         }
 
@@ -116,12 +117,29 @@ pub fn ClapApi(comptime config: Config) type {
 
         fn initPlugin(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) bool {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
-            _ = plugin;
+
+            if (builtin.target.os.tag == .linux) {
+                // Start timer
+                plugin.host_timer_support = @ptrCast(@alignCast(plugin.host.*.get_extension.?(plugin.host, &c.CLAP_EXT_TIMER_SUPPORT)));
+                if (plugin.host_timer_support) |host_timer_support| {
+                    _ = host_timer_support.register_timer.?(plugin.host, 200, &plugin.timer_id);
+                }
+            }
+
             return true;
         }
 
         fn destroyPlugin(clap_plugin: [*c]const c.clap_plugin_t) callconv(.c) void {
             const plugin: *ClapProcessor = @ptrCast(@alignCast(clap_plugin.*.plugin_data));
+
+            if (builtin.target.os.tag == .linux) {
+                // Stop timer
+                if (plugin.host_timer_support) |host_timer_support| {
+                    plugin.host_timer_support = host_timer_support;
+                    _ = host_timer_support.unregister_timer.?(plugin.host, plugin.timer_id);
+                }
+            }
+
             plugin.deinit();
             std.heap.c_allocator.destroy(plugin);
         }
@@ -188,6 +206,12 @@ pub fn ClapApi(comptime config: Config) type {
             return c.CLAP_PROCESS_CONTINUE;
         }
 
+        fn onMainThread(_: [*c]const c.clap_plugin_t) callconv(.c) void {
+            //
+        }
+
+        // ---Extensions---
+
         fn getExtension(
             _: [*c]const c.clap_plugin_t,
             id: [*c]const u8,
@@ -197,21 +221,17 @@ pub fn ClapApi(comptime config: Config) type {
             if (c_str.isEql(id.?, &c.CLAP_EXT_PARAMS)) return &ext_params;
             if (c_str.isEql(id.?, &c.CLAP_EXT_STATE)) return &ext_plugin_state;
             if (c_str.isEql(id.?, &c.CLAP_EXT_GUI)) return &ext_gui;
+            if (c_str.isEql(id.?, &c.CLAP_EXT_TIMER_SUPPORT)) return &ext_timer;
 
             return null;
         }
-
-        fn onMainThread(_: [*c]const c.clap_plugin_t) callconv(.c) void {
-            //
-        }
-
-        // ---Extensions---
 
         const ext_note_ports = ExtNotePorts(ClapProcessor).extension;
         const ext_audio_ports = ExtAudioPorts(ClapProcessor).extension;
         const ext_params = ExtParams(ClapProcessor).extension;
         const ext_plugin_state = ExtState(ClapProcessor).extension;
         const ext_gui = ExtGui(config).extension;
+        const ext_timer = ExtGui(config).timer_ext;
 
         // ---Tests---
 
